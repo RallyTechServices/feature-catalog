@@ -62,6 +62,8 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     _onBulkCopyToParentClicked: function() {
         var numRecords = this.records.length;
 
+        //todo add filters so that records cannot be copied to children of the template portfolio item 
+
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
             artifactTypes: [this.portfolioItemType.toLowerCase()],
             autoShow: true,
@@ -87,8 +89,9 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             ],
             listeners: {
                 artifactchosen: function(dialog, selectedRecord){
-                    Rally.ui.notify.Notifier.showMessage({
-                        message: numRecords + ' child records copied to ' + selectedRecord._refObjectName
+                    console.log('selectedRecord', selectedRecord);
+                    Rally.ui.notify.Notifier.show({
+                        message: numRecords + ' child records copied to parent ' + selectedRecord.get('FormattedID')
                     });
                     //Ext.Msg.alert('Chooser', selectedRecord.get('Name') + ' was chosen');
                 },

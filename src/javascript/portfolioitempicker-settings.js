@@ -7,7 +7,7 @@
 
         settingsParent: undefined,
         requestContext: undefined,
-
+        height: 345,
         mixins: [
             'Ext.form.field.Field'
         ],

@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Dec 07 2015 20:24:44 GMT-0600 (CST) -->
+    <!--  Build Date: Tue Dec 08 2015 08:29:14 GMT-0600 (CST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Dec 07 2015 20:24:44 GMT-0600 (CST)";
-        var CHECKSUM = 20902148407;
+        var APP_BUILD_DATE = "Tue Dec 08 2015 08:29:14 GMT-0600 (CST)";
+        var CHECKSUM = 21181558517;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -688,6 +688,8 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     _onBulkCopyToParentClicked: function() {
         var numRecords = this.records.length;
 
+        //todo add filters so that records cannot be copied to children of the template portfolio item 
+
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
             artifactTypes: [this.portfolioItemType.toLowerCase()],
             autoShow: true,
@@ -713,8 +715,9 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             ],
             listeners: {
                 artifactchosen: function(dialog, selectedRecord){
-                    Rally.ui.notify.Notifier.showMessage({
-                        message: numRecords + ' child records copied to ' + selectedRecord._refObjectName
+                    console.log('selectedRecord', selectedRecord);
+                    Rally.ui.notify.Notifier.show({
+                        message: numRecords + ' child records copied to parent ' + selectedRecord.get('FormattedID')
                     });
                     //Ext.Msg.alert('Chooser', selectedRecord.get('Name') + ' was chosen');
                 },
@@ -770,7 +773,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
 
         settingsParent: undefined,
         requestContext: undefined,
-
+        height: 345,
         mixins: [
             'Ext.form.field.Field'
         ],
