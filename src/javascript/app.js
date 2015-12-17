@@ -1,13 +1,16 @@
 Ext.define("feature-catalog", {
     extend: 'Rally.app.App',
+
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
+
     config: {
         defaultSettings: {
             portfolioItemPicker: null
         }
     },
+
     items: [
         {xtype:'container',itemId:'selector_box'},
         {xtype:'container',itemId:'display_box'}
@@ -16,10 +19,12 @@ Ext.define("feature-catalog", {
     launch: function() {
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
+                this.logger.log('success')
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[0].typePath,
                     success: function(model) {
+
                         this.portfolioItemModel = model;
                         this.updateDisplay();
                     },
@@ -32,9 +37,11 @@ Ext.define("feature-catalog", {
             scope: this
         });
     },
+
     getCatalogPortfolioItem: function(){
         return this.getSetting('portfolioItemPicker') || null;
     },
+
     updateDisplay: function(){
         this.down('#display_box').removeAll();
         if (this.getCatalogPortfolioItem()){
@@ -47,6 +54,7 @@ Ext.define("feature-catalog", {
             });
         }
     },
+
     _loadFeatureStore: function(parentPortfolioItem){
         this.logger.log('_loadFeatureStore', parentPortfolioItem);
 
@@ -70,9 +78,12 @@ Ext.define("feature-catalog", {
         });
         return store;
     },
+
     _addFeatureGrid: function(store){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
-            portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase();
+            portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
+            me = this;
+
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
         this.add({
@@ -91,7 +102,9 @@ Ext.define("feature-catalog", {
             bulkEditConfig: {
                 items: [{
                     xtype: 'rallyrecordmenuitembulkdeepcopy' ,
-                    portfolioItemType: portfolioItemParentModel
+                    portfolioItemType: portfolioItemParentModel,
+                    portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
+                    typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task']
                 }]
             },
             context: this.getContext(),
@@ -102,6 +115,9 @@ Ext.define("feature-catalog", {
             enableBulkEdit: true
         });
     },
+    _copyToParent: function(records, parent){
+        this.logger.log('_copyToParent', records, parent);
+    },
     getSettingsFields: function(){
         return [{
             xtype: 'chartportfolioitempicker',
@@ -109,6 +125,7 @@ Ext.define("feature-catalog", {
             fieldLabel: ''
         }];
     },
+
     getOptions: function() {
         return [
             {
@@ -127,8 +144,7 @@ Ext.define("feature-catalog", {
     isExternal: function(){
         return typeof(this.getAppId()) == 'undefined';
     },
-    
-    //onSettingsUpdate:  Override
+
     onSettingsUpdate: function (settings){
         this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);

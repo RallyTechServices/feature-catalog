@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Dec 08 2015 08:29:14 GMT-0600 (CST) -->
+    <!--  Build Date: Wed Dec 16 2015 23:03:29 GMT-0600 (CST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Dec 08 2015 08:29:14 GMT-0600 (CST)";
-        var CHECKSUM = 21181558517;
+        var APP_BUILD_DATE = "Wed Dec 16 2015 23:03:29 GMT-0600 (CST)";
+        var CHECKSUM = 25629445267;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -178,14 +178,17 @@ Ext.define('Rally.technicalservices.Logger',{
 
 Ext.define("feature-catalog", {
     extend: 'Rally.app.App',
+
     componentCls: 'app',
     logger: new Rally.technicalservices.Logger(),
     defaults: { margin: 10 },
+
     config: {
         defaultSettings: {
             portfolioItemPicker: null
         }
     },
+
     items: [
         {xtype:'container',itemId:'selector_box'},
         {xtype:'container',itemId:'display_box'}
@@ -194,10 +197,12 @@ Ext.define("feature-catalog", {
     launch: function() {
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
+                this.logger.log('success')
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[0].typePath,
                     success: function(model) {
+
                         this.portfolioItemModel = model;
                         this.updateDisplay();
                     },
@@ -210,9 +215,11 @@ Ext.define("feature-catalog", {
             scope: this
         });
     },
+
     getCatalogPortfolioItem: function(){
         return this.getSetting('portfolioItemPicker') || null;
     },
+
     updateDisplay: function(){
         this.down('#display_box').removeAll();
         if (this.getCatalogPortfolioItem()){
@@ -225,6 +232,7 @@ Ext.define("feature-catalog", {
             });
         }
     },
+
     _loadFeatureStore: function(parentPortfolioItem){
         this.logger.log('_loadFeatureStore', parentPortfolioItem);
 
@@ -248,9 +256,12 @@ Ext.define("feature-catalog", {
         });
         return store;
     },
+
     _addFeatureGrid: function(store){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
-            portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase();
+            portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
+            me = this;
+
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
         this.add({
@@ -269,7 +280,9 @@ Ext.define("feature-catalog", {
             bulkEditConfig: {
                 items: [{
                     xtype: 'rallyrecordmenuitembulkdeepcopy' ,
-                    portfolioItemType: portfolioItemParentModel
+                    portfolioItemType: portfolioItemParentModel,
+                    portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
+                    typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task']
                 }]
             },
             context: this.getContext(),
@@ -280,6 +293,9 @@ Ext.define("feature-catalog", {
             enableBulkEdit: true
         });
     },
+    _copyToParent: function(records, parent){
+        this.logger.log('_copyToParent', records, parent);
+    },
     getSettingsFields: function(){
         return [{
             xtype: 'chartportfolioitempicker',
@@ -287,6 +303,7 @@ Ext.define("feature-catalog", {
             fieldLabel: ''
         }];
     },
+
     getOptions: function() {
         return [
             {
@@ -305,8 +322,7 @@ Ext.define("feature-catalog", {
     isExternal: function(){
         return typeof(this.getAppId()) == 'undefined';
     },
-    
-    //onSettingsUpdate:  Override
+
     onSettingsUpdate: function (settings){
         this.logger.log('onSettingsUpdate',settings);
         Ext.apply(this, settings);
@@ -314,6 +330,42 @@ Ext.define("feature-catalog", {
     }
 });
 
+/**
+ * Created by kcorkan on 12/16/15.
+ */
+Ext.define('Rally.technicalservices.ArtifactChildMapper',{
+    singleton: true,
+
+    typeToChildMapping: {
+        hierarchicalrequirement: {
+            Tasks: 'task',
+            Children: 'hierarchicalrequirement',
+            Defects: 'defect'
+        },
+        defect: {
+            Tasks: 'task'
+        }
+    },
+
+    getChildCollectionFields: function(portfolioItemTypes, type){
+        var children = this.typeToChildMapping[type.toLowerCase()] || {};
+        if (children.length > 0){
+            return children;
+        }
+
+        var portfolioItemTypesLowerCase = _.map(portfolioItemTypes, function(p){return p.toLowerCase();}),
+            idx = _.indexOf(portfolioItemTypesLowerCase, type.toLowerCase());
+        if (idx >= 0){
+            if (idx === 0){
+                return {UserStories: 'hierarchicalrequirement'};
+            } else {
+                return {Children: this.portfolioItemTypes[idx-1].toLowerCase()} ;
+            }
+        }
+
+        return [];
+    }
+});
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
@@ -394,6 +446,126 @@ Ext.define("feature-catalog", {
         }
     });
 })();
+Ext.define('Rally.technicalservices.DeepCopier',{
+
+    mixins: {
+        observable: 'Ext.util.Observable'
+    },
+
+    typesToCopy: undefined,
+    modelHash: undefined,
+    portfolioItemTypes: undefined,
+    recordsToCopy: undefined,
+    blacklistFields: ['Workspace','Attachments','Tags','Discussion','Milestones','Predecessors','Successors'],
+
+    constructor: function(config){
+        this.typesToCopy = config.typesToCopy || ['PortfolioItem','HierarchicalRequirement','Defect','Task'];
+        var recordsToCopy = config.records || [];
+        var overrides = config.overrides || {};
+
+        this.mixins.observable.constructor.call(this, config);
+
+        Rally.data.ModelFactory.getModels({
+            types: this.typesToCopy,
+            success: function(models){
+                this.modelHash = {};
+                _.each(models, function(model){
+                    this.modelHash[model.getField('_type').modelType] = model;
+                }, this);
+                this.copyArtifacts(recordsToCopy, overrides);
+            },
+            scope: this
+        });
+    },
+    copyArtifacts: function(recordsToCopy, overrides){
+        var me = this,
+            promises = [];
+
+        _.each(recordsToCopy, function(r){
+            promises.push(function(){ return me.copyArtifact(r, overrides); });
+        }, this);
+
+        Deft.Chain.sequence(promises).then({
+            success: function(results){
+                console.log('success', results);
+            },
+            scope: this
+        });
+    },
+    copyArtifact: function(artifactToCopy, overrides){
+        var deferred = Ext.create('Deft.Deferred');
+
+        var model = this.modelHash[artifactToCopy.get('_type').toLowerCase()];
+
+        model.load(artifactToCopy.get('ObjectID'), {
+            fetch: true,
+            scope: this,
+            callback: function(loadedArtifact, operation) {
+                if(operation.wasSuccessful()) {
+                    var fields = this.getFieldsToCopy(loadedArtifact,overrides);
+
+                    Ext.create(model, fields).save({
+                        callback: function(result, operation){
+                            console.log('save', result);
+                            if (operation.wasSuccessful()){
+                                deferred.resolve({source: artifactToCopy, result: result, error: null, fields: fields});
+                            } else {
+                                deferred.resolve({source: artifactToCopy, result: null, error: operation.error.errors.join(','), fields: fields})
+                            }
+                        }
+                    });
+                }
+            }
+        });
+
+
+
+        return deferred;
+    },
+    getFieldsToCopy: function(artifactToCopy, overrideFields){
+        var fields = artifactToCopy.getFields(),
+            copyableFields = _.filter(fields, this._fieldIsCopyable, this),
+            fieldHash = {};
+
+        _.each(copyableFields, function(f){
+            console.log('field', f);
+
+            //if field is collection and count === 0, then it can be null, otherwise, we need to copy the cooleciton
+            if (f.attributeDefinition.AttributeType === "COLLECTION"){
+                //todo copy collection
+            }
+
+            var val = artifactToCopy.get(f.name) || null;
+
+            if (val && Ext.isObject(val)){  //If this is a reference field, then we need to use the ObjectId
+                val = val.ObjectID;
+            }
+
+            if (_.has(overrideFields, f.name)){
+                val = overrideFields[f.name];
+            }
+
+            if (val){
+                fieldHash[f.name] = val;
+            }
+        });
+        console.log('fieldHash', fieldHash);
+        return fieldHash;
+    },
+    _fieldIsCopyable: function(field){
+        if (Ext.Array.contains(this.blacklistFields, field.name)){
+            return false;
+        }
+        if (field.hidden || field.readOnly){
+            return false;
+        }
+        if (field.attributeDefinition){
+            return true;
+        }
+        return false;
+    }
+});
+
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
@@ -627,68 +799,23 @@ Ext.define("feature-catalog", {
 Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     alias: 'widget.rallyrecordmenuitembulkdeepcopy',
     extend: 'Rally.ui.menu.bulk.MenuItem',
-    requires: ['Rally.ui.notify.Notifier'],
 
     config: {
         text: 'Copy to Parent...',
-        handler: function() {
+        handler: function () {
             this._onBulkCopyToParentClicked();
         },
-        predicate: function(records) {
-            return _.every(records, function(record) {
+        predicate: function (records) {
+            return _.every(records, function (record) {
                 return record.self.isArtifact() || record.self.isTimebox();
             });
-        },
-
-        saveRecords: function(records, args) {
-
-            var promises = _.map(records, function(record){
-                return this._saveRecord(record, args);
-            }, this);
-
-            Deft.Promise.all(promises).then({
-                scope: this,
-                success: function(results){
-                    var successfulRecords = [],
-                        unsuccessfulRecords = [],
-                        errorMessage= '';
-
-                    _.each(results, function(r){
-                        if (r.successfulRecord){
-                            successfulRecords.push(r.successfulRecord);
-                        } else {
-                            unsuccessfulRecords.push(r.unsuccessfulRecord);
-                            errorMessage = r.operation && r.operation.error && r.operation.error.errors.join(',') || "Error updating record " + r.unsuccessfulRecord.get('FormattedID');
-                        }
-
-                    });
-                    this.onSuccess(successfulRecords, unsuccessfulRecords, args, errorMessage);
-                }
-            });
-
-
         }
     },
-    _saveRecord: function(record, args){
-        var deferred = Ext.create('Deft.Deferred');
-
-        record.set(args.field.name, args.value);
-
-        record.save({
-            callback: function(result, operation){
-                if (operation.wasSuccessful()){
-                    deferred.resolve({successfulRecord: record, unsuccessfulRecord: null});
-                } else {
-                    deferred.resolve({successfulRecord: null, unsuccessfulRecord: record, operation: operation});
-                }
-            }
-        });
-        return deferred;
-    },
-    _onBulkCopyToParentClicked: function() {
-        var numRecords = this.records.length;
-
-        //todo add filters so that records cannot be copied to children of the template portfolio item 
+     _onBulkCopyToParentClicked: function() {
+        var records = this.records,
+            me = this;
+        console.log('_showParentPicker');
+        //todo add filters so that records cannot be copied to children of the template portfolio item
 
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
             artifactTypes: [this.portfolioItemType.toLowerCase()],
@@ -715,53 +842,32 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             ],
             listeners: {
                 artifactchosen: function(dialog, selectedRecord){
-                    console.log('selectedRecord', selectedRecord);
-                    Rally.ui.notify.Notifier.show({
-                        message: numRecords + ' child records copied to parent ' + selectedRecord.get('FormattedID')
-                    });
-                    //Ext.Msg.alert('Chooser', selectedRecord.get('Name') + ' was chosen');
+                    console.log('artifactchosen');
+                    me.copyRecords(records, selectedRecord);
                 },
-                scope: this
+                scope: me
             }
         });
     },
+    copyRecords: function(records, parent){
 
-    _onEdit: function(dialog, args) {
-        if (this.onBeforeAction(this.records) === false) {
-            return;
-        }
-        //this.saveRecords(this.records, args);
+        Ext.create('Rally.technicalservices.DeepCopier',{
+            portfolioItemTypes: this.portfolioItemTypes,
+            typesToCopy: this.typesToCopy,
+            records: records,
+            overrides: {Parent: parent.get('_ref')},
+            listeners: {
+                copycompleted: function(successfulRecords, unsuccessfulRecords){
+                    console.log('copycompleted');
+                },
+                copyerror: function(error){
+                    console.log('copyerror');
+                }
+            }
+        });
     },
-
-    /**
-     * @override
-     * @inheritdoc
-     */
-    onSuccess: function (successfulRecords, unsuccessfulRecords, args, errorMessage) {
-
-        var message = successfulRecords.length + (successfulRecords.length === 1 ? ' item has' : ' items have');
-
-
-        message += ' had ' + args.displayName;
-        if (args.value === null || args.value === '') {
-            message += ' removed';
-        } else {
-            message += ' changed to "' + (args.displayValue || args.value) + '"';
-        }
-
-        if(successfulRecords.length === this.records.length) {
-            Rally.ui.notify.Notifier.show({
-                message: message + '.'
-            });
-        } else {
-            Rally.ui.notify.Notifier.showWarning({
-                message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage
-            });
-        }
-
-        var changes = {};
-        changes[args.field.name] = args.value;
-        Ext.callback(this.onActionComplete, null, [successfulRecords, unsuccessfulRecords, changes]);
+    _copyAllRecords: function(records, parent, deepCopier){
+        console.log('_copyAllRecords', deepCopier, parent, records);
     }
 });
 (function () {
