@@ -19,7 +19,7 @@ Ext.define("feature-catalog", {
     launch: function() {
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
-                this.logger.log('success')
+                this.logger.log('success', portfolioItemTypes)
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[0].typePath,

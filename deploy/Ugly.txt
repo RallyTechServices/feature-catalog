@@ -3,10 +3,10 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Wed Dec 16 2015 23:03:29 GMT-0600 (CST) -->
+    <!--  Build Date: Mon Dec 21 2015 22:02:38 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Wed Dec 16 2015 23:03:29 GMT-0600 (CST)";
+        var APP_BUILD_DATE = "Mon Dec 21 2015 22:02:38 GMT-0700 (MST)";
         var CHECKSUM = [%= checksum %];
     </script>
     

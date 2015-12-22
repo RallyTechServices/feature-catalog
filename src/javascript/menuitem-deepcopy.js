@@ -52,21 +52,35 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
         });
     },
     copyRecords: function(records, parent){
-
-        Ext.create('Rally.technicalservices.DeepCopier',{
+        console.log('copyRecrds');
+        var artifactTree = Ext.create('Rally.technicalservices.ArtifactTree',{
+            rootArtifact: records[0],
             portfolioItemTypes: this.portfolioItemTypes,
-            typesToCopy: this.typesToCopy,
-            records: records,
-            overrides: {Parent: parent.get('_ref')},
             listeners: {
-                copycompleted: function(successfulRecords, unsuccessfulRecords){
-                    console.log('copycompleted');
-                },
-                copyerror: function(error){
-                    console.log('copyerror');
+                treeloaded: function(tree){
+                    console.log('treeloaded',tree);
+                    tree.deepCopy(parent);
                 }
             }
         });
+        artifactTree.load(records[0]);
+
+        //Ext.create('Rally.technicalservices.DeepCopier',{
+        //    portfolioItemTypes: this.portfolioItemTypes,
+        //    typesToCopy: this.typesToCopy,
+        //    records: records,
+        //    overrides: {Parent: parent.get('_ref')},
+        //    listeners: {
+        //        copycompleted: function(successCount, totalCount, results){
+        //            console.log('copycompleted');
+        //            var msg = Ext.String.format("{0} or {1} items copied successfully to {2}: {3}", successCount, totalCount, parent.get('FormattedID'), parent.get('Name'));
+        //            Rally.ui.notify.Notifier.showMessage({message: msg});
+        //        },
+        //        copyerror: function(error){
+        //            console.log('copyerror');
+        //        }
+        //    }
+        //});
     },
     _copyAllRecords: function(records, parent, deepCopier){
         console.log('_copyAllRecords', deepCopier, parent, records);
