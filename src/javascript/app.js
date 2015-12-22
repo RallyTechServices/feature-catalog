@@ -60,7 +60,7 @@ Ext.define("feature-catalog", {
 
         //todo: make this adapatable to the type of portfolio item chosen
         var filters = [{
-            property: 'Parent.Parent',
+            property: 'Parent.Parent.Parent',
             value: parentPortfolioItem
         }];
 
