@@ -104,7 +104,12 @@ Ext.define("feature-catalog", {
                     xtype: 'rallyrecordmenuitembulkdeepcopy' ,
                     portfolioItemType: portfolioItemParentModel,
                     portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
-                    typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task']
+                    typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task'],
+                    listeners: {
+                        statusupdate: function(done, total){
+                            console.log('app status update', done, total);
+                        }
+                    }
                 }]
             },
             context: this.getContext(),

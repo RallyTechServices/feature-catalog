@@ -16,7 +16,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
     stoppedByError: false,
 
     constructor: function(config){
-        this.dependentArtifactTypes = ['task'];
+
         this.blacklistFields = ['Workspace','Attachments','Tags','Discussion','Milestones','Predecessors','Successors'];
         this.childTypesBlacklist = config.childTypesBlacklist || ['testcase','defectsuite','defect'];
         this.parentChildTypeMap = this._setupParentChildMap(config.portfolioItemTypes);
@@ -29,12 +29,19 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.totalRecords = 1;
         this.tree = {};
         this.stoppedByError = false;
+        this.rootArtifact = rootArtifact;
         this._loadModel(rootArtifact);
+    },
+    _updateStatus: function(){
+        this.fireEvent('statusupdate', this.completedArtifacts, this.totalArtifacts);
     },
     deepCopy: function(parent){
         this.logger.log('deepCopy');
         var me = this;
+        this.totalArtifacts = _.keys(this.tree).length || 0;
+        this.completedArtifacts = 0;
 
+        this.fireEvent('statusupdate', 0, this.totalArtifacts);
         me._copyStandaloneArtifacts({PortfolioItem: "", Parent: ""}).then({
             success: function(){
                 this.logger.log('deepCopy. _copyStandaloneArtifacts success');
@@ -48,7 +55,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                         root.set("Parent", parent.get('_ref'));
                         root.save().then({
                             success: function(result, operation){
-                                me.fireEvent('copycompleted', this.rootArtifact);
+                                me.fireEvent('copycompleted', me.tree[me.rootArtifact.get('ObjectID')].copyRecord);
                             },
                             failure: function(operation){
                                 me.fireEvent('copyerror', Ext.String.format("Error stitching {0} to {1}: {2}", me.rootArtifact.copyRecord.get('FormattedID'), parent.get('FormattedID'), operation.error.errors.join(',')));
@@ -198,6 +205,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                         this.logger.log('copyArtifact callback', operation.wasSuccessful(), result, operation);
                         if (operation.wasSuccessful()){
                             this.tree[artifactOid].copyRecord = result;
+                            this.completedArtifacts++;
+                            this._updateStatus();
                             deferred.resolve();
                         } else {
                             this.tree[artifactOid].copyRecord = null;

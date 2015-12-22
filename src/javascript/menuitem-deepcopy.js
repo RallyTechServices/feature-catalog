@@ -3,7 +3,21 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     extend: 'Rally.ui.menu.bulk.MenuItem',
 
     config: {
+        onBeforeAction: function(){
+            console.log('onbeforeaction');
+        },
+
+        /**
+         * @cfg {Function} onActionComplete a function called when the specified menu item action has completed
+         * @param Rally.data.wsapi.Model[] onActionComplete.successfulRecords any successfully modified records
+         * @param Rally.data.wsapi.Model[] onActionComplete.unsuccessfulRecords any records which failed to be updated
+         */
+        onActionComplete: function(){
+            console.log('onActionComplete');
+        },
+
         text: 'Copy to Parent...',
+
         handler: function () {
             this._onBulkCopyToParentClicked();
         },
@@ -51,38 +65,77 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             }
         });
     },
-    copyRecords: function(records, parent){
-        console.log('copyRecrds');
+    _copyRecord: function(record, parent){
+        var deferred = Ext.create('Deft.Deferred');
+
         var artifactTree = Ext.create('Rally.technicalservices.ArtifactTree',{
-            rootArtifact: records[0],
             portfolioItemTypes: this.portfolioItemTypes,
             listeners: {
                 treeloaded: function(tree){
-                    console.log('treeloaded',tree);
-                    tree.deepCopy(parent);
-                }
+                     tree.deepCopy(parent);
+                },
+                copycompleted: function(rootRecord){
+                    deferred.resolve(rootRecord);
+                },
+                copyerror: function(errorMsg){
+                    deferred.resolve(errorMsg);
+                },
+                statusupdate: function(done, total){
+                    this.fireEvent('statusupdate',done,total);
+                },
+                scope: this
             }
         });
-        artifactTree.load(records[0]);
+        artifactTree.load(record);
 
-        //Ext.create('Rally.technicalservices.DeepCopier',{
-        //    portfolioItemTypes: this.portfolioItemTypes,
-        //    typesToCopy: this.typesToCopy,
-        //    records: records,
-        //    overrides: {Parent: parent.get('_ref')},
-        //    listeners: {
-        //        copycompleted: function(successCount, totalCount, results){
-        //            console.log('copycompleted');
-        //            var msg = Ext.String.format("{0} or {1} items copied successfully to {2}: {3}", successCount, totalCount, parent.get('FormattedID'), parent.get('Name'));
-        //            Rally.ui.notify.Notifier.showMessage({message: msg});
-        //        },
-        //        copyerror: function(error){
-        //            console.log('copyerror');
-        //        }
-        //    }
-        //});
+        return deferred;
     },
-    _copyAllRecords: function(records, parent, deepCopier){
-        console.log('_copyAllRecords', deepCopier, parent, records);
+    copyRecords: function(records, parent){
+        var promises= [],
+            successfulRecords = [],
+            unsuccessfulRecords = [];
+        _.each(records, function(r){
+            promises.push(function() {
+                return this._copyRecord(r, parent);
+            });
+        }, this);
+
+        Deft.Chain.sequence(promises, this).then({
+            success: function(results){
+                var errorMessage = '';
+                _.each(results, function(r){
+                    if (Ext.isString(r)){
+                        errorMessage = r;
+                        unsuccessfulRecords.push(r);
+                    } else {
+                        successfulRecords.push(r);
+                    }
+                });
+                this.onSuccess(successfulRecords, unsuccessfulRecords, {parent: parent}, errorMessage);
+                console.log('success',successfulRecords, unsuccessfulRecords, errorMessage);
+            },
+            failure: function(msg){
+
+            },
+            scope: this
+        });
+
+    },
+    onSuccess: function (successfulRecords, unsuccessfulRecords, args, errorMessage) {
+
+        var formattedID = args && args.parent.get('FormattedID'),
+            message = successfulRecords.length + (successfulRecords.length === 1 ? ' item has' : ' items have');
+
+        if(successfulRecords.length === this.records.length) {
+            Rally.ui.notify.Notifier.show({
+                message: message +  'been deep copied to ' + formattedID
+            });
+        } else {
+            Rally.ui.notify.Notifier.showWarning({
+                message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage
+            });
+        }
+
+        Ext.callback(this.onActionComplete, null, [successfulRecords, unsuccessfulRecords]);
     }
 });
