@@ -30,7 +30,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
      _onBulkCopyToParentClicked: function() {
         var records = this.records,
             me = this;
-        console.log('_showParentPicker');
+
         //todo add filters so that records cannot be copied to children of the template portfolio item
 
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
@@ -67,6 +67,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     },
     _copyRecord: function(record, parent){
         var deferred = Ext.create('Deft.Deferred');
+        var fid = record.get('FormattedID');
 
         var artifactTree = Ext.create('Rally.technicalservices.ArtifactTree',{
             portfolioItemTypes: this.portfolioItemTypes,
@@ -75,12 +76,14 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
                      tree.deepCopy(parent);
                 },
                 copycompleted: function(rootRecord){
-                    deferred.resolve(rootRecord);
+                    deferred.resolve({record: record});
                 },
                 copyerror: function(errorMsg){
-                    deferred.resolve(errorMsg);
+                    deferred.resolve({record: record, errorMessage: errorMsg});
                 },
                 statusupdate: function(done, total){
+                    Rally.ui.notify.Notifier.showStatus({message:Ext.String.format("{0}: {1} of {2} Artifacts copied...", fid, done, total)});
+
                     this.fireEvent('statusupdate',done,total);
                 },
                 scope: this
@@ -104,18 +107,19 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             success: function(results){
                 var errorMessage = '';
                 _.each(results, function(r){
-                    if (Ext.isString(r)){
-                        errorMessage = r;
-                        unsuccessfulRecords.push(r);
+                    if (r.errorMessage){
+                        errorMessage = r.errorMessage;
+                        unsuccessfulRecords.push(r.record);
                     } else {
-                        successfulRecords.push(r);
+                        successfulRecords.push(r.record);
                     }
                 });
+
                 this.onSuccess(successfulRecords, unsuccessfulRecords, {parent: parent}, errorMessage);
-                console.log('success',successfulRecords, unsuccessfulRecords, errorMessage);
             },
             failure: function(msg){
 
+                this.onSuccess([], [], {parent: parent}, msg);
             },
             scope: this
         });
@@ -124,13 +128,17 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     onSuccess: function (successfulRecords, unsuccessfulRecords, args, errorMessage) {
 
         var formattedID = args && args.parent.get('FormattedID'),
-            message = successfulRecords.length + (successfulRecords.length === 1 ? ' item has' : ' items have');
+            message = successfulRecords.length + (successfulRecords.length === 1 ? ' item has ' : ' items have ');
 
         if(successfulRecords.length === this.records.length) {
             Rally.ui.notify.Notifier.show({
                 message: message +  'been deep copied to ' + formattedID
             });
         } else {
+            if (successfulRecords.length === 0){
+                message = "0 items have been copied"
+            }
+
             Rally.ui.notify.Notifier.showWarning({
                 message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage
             });

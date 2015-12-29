@@ -86,7 +86,7 @@ Ext.define("feature-catalog", {
 
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
-        this.add({
+        this.down('#display_box').add({
             xtype: 'rallygrid',
             store: store,
             columnCfgs: [
