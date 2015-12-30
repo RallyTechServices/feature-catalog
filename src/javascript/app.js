@@ -12,7 +12,7 @@ Ext.define("feature-catalog", {
     },
 
     items: [
-        {xtype:'container',itemId:'selector_box'},
+        {xtype:'container',itemId:'selector_box', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
@@ -45,8 +45,7 @@ Ext.define("feature-catalog", {
     updateDisplay: function(){
         this.down('#display_box').removeAll();
         if (this.getCatalogPortfolioItem()){
-            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
-            this._addFeatureGrid(store);
+            this._addSecondLevelPicker(this.getCatalogPortfolioItem());
         } else {
             this.down('#display_box').add({
                 xtype: 'container',
@@ -54,13 +53,74 @@ Ext.define("feature-catalog", {
             });
         }
     },
+    _addSecondLevelPicker: function(parentPortfolioItem){
+        this.down('#selector_box').removeAll();
 
+        var regex = new RegExp("^/(portfolioitem/.+)/","i"),
+            parentType = parentPortfolioItem.match(regex)[1],
+            types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
+
+        this.logger.log('_addSecondLevelPicker', parentType, types);
+        var idx = _.indexOf(types, parentType);
+        if (idx > 2){
+            var property = _.range(idx-2).map(function(p){return "Parent";}).join(".");
+            this.logger.log('property', types, property, types[idx-1]);
+            var filters = [{
+                property: property,
+                value: parentPortfolioItem
+            },{
+                property: 'DirectChildrenCount',
+                operator: '>',
+                value: 0
+            }];
+            //
+            //var cbStore = Ext.create('Rally.data.wsapi.Store',{
+            //    model: types[idx-1],
+            //    filters: filters,
+            //    fetch: ["Name","ObjectID"]
+            //});
+            //
+            //cbStore.load();
+
+            this.down('#selector_box').add({
+                xtype: 'rallycatalogcombobox',
+                fieldLabel: this.portfolioItemTypes[2].name,
+                labelAlign: 'right',
+                allowBlank: false,
+                storeConfig: {
+                    model: types[2],
+                    filters: filters
+                },
+                displayField: 'Name',
+                valueField: 'ObjectID',
+                margin: 5,
+                listeners: {
+                    scope: this,
+                    change: function(cb){
+                        this.logger.log('Parent.Parent Combo change', cb.getRecord());
+                        if (cb.getValue()){
+                            var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
+                            this._addFeatureGrid(store);
+                        }
+                    }
+                }
+            });
+
+        } else {
+            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
+            this._addFeatureGrid(store);
+        }
+    },
     _loadFeatureStore: function(parentPortfolioItem){
         this.logger.log('_loadFeatureStore', parentPortfolioItem);
 
+        if (this.down('rallygrid')){
+            this.down('rallygrid').destroy();
+        }
+
         //todo: make this adapatable to the type of portfolio item chosen
         var filters = [{
-            property: 'Parent.Parent.Parent',
+            property: 'Parent.Parent',
             value: parentPortfolioItem
         }];
 
@@ -84,6 +144,8 @@ Ext.define("feature-catalog", {
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
 
+
+        this.down('#display_box').removeAll();
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
         this.down('#display_box').add({

@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Dec 29 2015 15:59:14 GMT-0700 (MST) -->
+    <!--  Build Date: Tue Dec 29 2015 17:47:16 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Dec 29 2015 15:59:14 GMT-0700 (MST)";
-        var CHECKSUM = 54819022477;
+        var APP_BUILD_DATE = "Tue Dec 29 2015 17:47:16 GMT-0700 (MST)";
+        var CHECKSUM = 62735560312;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -190,7 +190,7 @@ Ext.define("feature-catalog", {
     },
 
     items: [
-        {xtype:'container',itemId:'selector_box'},
+        {xtype:'container',itemId:'selector_box', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
@@ -223,8 +223,7 @@ Ext.define("feature-catalog", {
     updateDisplay: function(){
         this.down('#display_box').removeAll();
         if (this.getCatalogPortfolioItem()){
-            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
-            this._addFeatureGrid(store);
+            this._addSecondLevelPicker(this.getCatalogPortfolioItem());
         } else {
             this.down('#display_box').add({
                 xtype: 'container',
@@ -232,13 +231,74 @@ Ext.define("feature-catalog", {
             });
         }
     },
+    _addSecondLevelPicker: function(parentPortfolioItem){
+        this.down('#selector_box').removeAll();
 
+        var regex = new RegExp("^/(portfolioitem/.+)/","i"),
+            parentType = parentPortfolioItem.match(regex)[1],
+            types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
+
+        this.logger.log('_addSecondLevelPicker', parentType, types);
+        var idx = _.indexOf(types, parentType);
+        if (idx > 2){
+            var property = _.range(idx-2).map(function(p){return "Parent";}).join(".");
+            this.logger.log('property', types, property, types[idx-1]);
+            var filters = [{
+                property: property,
+                value: parentPortfolioItem
+            },{
+                property: 'DirectChildrenCount',
+                operator: '>',
+                value: 0
+            }];
+            //
+            //var cbStore = Ext.create('Rally.data.wsapi.Store',{
+            //    model: types[idx-1],
+            //    filters: filters,
+            //    fetch: ["Name","ObjectID"]
+            //});
+            //
+            //cbStore.load();
+
+            this.down('#selector_box').add({
+                xtype: 'rallycatalogcombobox',
+                fieldLabel: this.portfolioItemTypes[2].name,
+                labelAlign: 'right',
+                allowBlank: false,
+                storeConfig: {
+                    model: types[2],
+                    filters: filters
+                },
+                displayField: 'Name',
+                valueField: 'ObjectID',
+                margin: 5,
+                listeners: {
+                    scope: this,
+                    change: function(cb){
+                        this.logger.log('Parent.Parent Combo change', cb.getRecord());
+                        if (cb.getValue()){
+                            var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
+                            this._addFeatureGrid(store);
+                        }
+                    }
+                }
+            });
+
+        } else {
+            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
+            this._addFeatureGrid(store);
+        }
+    },
     _loadFeatureStore: function(parentPortfolioItem){
         this.logger.log('_loadFeatureStore', parentPortfolioItem);
 
+        if (this.down('rallygrid')){
+            this.down('rallygrid').destroy();
+        }
+
         //todo: make this adapatable to the type of portfolio item chosen
         var filters = [{
-            property: 'Parent.Parent.Parent',
+            property: 'Parent.Parent',
             value: parentPortfolioItem
         }];
 
@@ -262,6 +322,8 @@ Ext.define("feature-catalog", {
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
 
+
+        this.down('#display_box').removeAll();
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
         this.down('#display_box').add({
@@ -828,6 +890,64 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
 });
 
+Ext.define('Rally.technicalservices.CatalogCombobox',{
+    extend: 'Rally.ui.combobox.ComboBox',
+    alias: 'widget.rallycatalogcombobox',
+
+    config: {
+        name: 'Catalog Items',
+
+        storeConfig: {
+            fetch: ["Name", "ObjectID", "FormattedID"],
+            remoteFilter: true,
+            autoLoad: true
+        },
+
+        listConfig: {
+            emptyText: 'No Items to select from',
+            minWidth: 500
+        },
+        width: 500,
+        minWidth: 500,
+        matchFieldWidth: true,
+        queryMode: 'local',
+        showArrows: true
+
+    },
+
+    constructor: function(config) {
+        this.mergeConfig(config);
+
+        this.plugins = (this.plugins || []);
+        this.plugins.push({
+            ptype: 'rallycomboboxpreviousnextarrows',
+            arrowUserAction: 'Program change via arrow button'
+        });
+
+        this.callParent([this.config]);
+
+        if (this.comboBoxPreviousNextArrowsPlugin) {
+            if (this.rendered) {
+                this.comboBoxPreviousNextArrowsPlugin.enableDisableArrows();
+            } else {
+                this.on('afterrender', function() {
+                    this.comboBoxPreviousNextArrowsPlugin.enableDisableArrows();
+                }, this);
+            }
+        }
+    },
+
+    setDefaultValue: function() {
+        this.callParent(arguments);
+        if(this.isDestroyed) {
+            return;
+        }
+
+
+            this.setValue(this.store.getAt(0).get(this.valueField));
+
+    }
+});
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
