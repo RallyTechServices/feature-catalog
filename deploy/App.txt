@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Dec 22 2015 11:46:57 GMT-0700 (MST) -->
+    <!--  Build Date: Tue Dec 29 2015 18:05:15 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Dec 22 2015 11:46:57 GMT-0700 (MST)";
-        var CHECKSUM = 50579756388;
+        var APP_BUILD_DATE = "Tue Dec 29 2015 18:05:15 GMT-0700 (MST)";
+        var CHECKSUM = 62897690206;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -190,7 +190,7 @@ Ext.define("feature-catalog", {
     },
 
     items: [
-        {xtype:'container',itemId:'selector_box'},
+        {xtype:'container',itemId:'selector_box', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
@@ -223,8 +223,7 @@ Ext.define("feature-catalog", {
     updateDisplay: function(){
         this.down('#display_box').removeAll();
         if (this.getCatalogPortfolioItem()){
-            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
-            this._addFeatureGrid(store);
+            this._addSecondLevelPicker(this.getCatalogPortfolioItem());
         } else {
             this.down('#display_box').add({
                 xtype: 'container',
@@ -232,13 +231,75 @@ Ext.define("feature-catalog", {
             });
         }
     },
+    _addSecondLevelPicker: function(parentPortfolioItem){
+        this.down('#selector_box').removeAll();
 
+        var regex = new RegExp("^/(portfolioitem/.+)/","i"),
+            parentType = parentPortfolioItem.match(regex)[1],
+            types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
+
+        this.logger.log('_addSecondLevelPicker', parentType, types);
+        var idx = _.indexOf(types, parentType);
+
+        var parentFiltersProperty = _.range(idx-1).map(function(p){return "Parent";}).join("."),
+            parentFilters = [{
+                property: parentFiltersProperty,
+                operator: "!=",
+                value: parentPortfolioItem
+            }];
+
+
+        if (idx > 2){
+            var property = _.range(idx-2).map(function(p){return "Parent";}).join(".");
+            this.logger.log('property', types, property, types[idx-1]);
+            var filters = [{
+                property: property,
+                value: parentPortfolioItem
+            },{
+                property: 'DirectChildrenCount',
+                operator: '>',
+                value: 0
+            }];
+
+            this.down('#selector_box').add({
+                xtype: 'rallycatalogcombobox',
+                fieldLabel: this.portfolioItemTypes[2].name,
+                labelAlign: 'right',
+                allowBlank: false,
+                storeConfig: {
+                    model: types[2],
+                    filters: filters
+                },
+                displayField: 'Name',
+                valueField: 'ObjectID',
+                margin: 5,
+                listeners: {
+                    scope: this,
+                    change: function(cb){
+                        this.logger.log('Parent.Parent Combo change', cb.getRecord());
+                        if (cb.getValue()){
+                            var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
+                            this._addFeatureGrid(store, parentFilters);
+                        }
+                    }
+                }
+            });
+
+        } else {
+            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
+            this._addFeatureGrid(store,parentFilters);
+        }
+    },
     _loadFeatureStore: function(parentPortfolioItem){
         this.logger.log('_loadFeatureStore', parentPortfolioItem);
 
+        if (this.down('rallygrid')){
+            this.down('rallygrid').destroy();
+        }
+
         //todo: make this adapatable to the type of portfolio item chosen
         var filters = [{
-            property: 'Parent.Parent.Parent',
+            property: 'Parent.Parent',
             value: parentPortfolioItem
         }];
 
@@ -257,14 +318,16 @@ Ext.define("feature-catalog", {
         return store;
     },
 
-    _addFeatureGrid: function(store){
+    _addFeatureGrid: function(store, parentFilters){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
 
+
+        this.down('#display_box').removeAll();
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
-        this.add({
+        this.down('#display_box').add({
             xtype: 'rallygrid',
             store: store,
             columnCfgs: [
@@ -283,6 +346,7 @@ Ext.define("feature-catalog", {
                     portfolioItemType: portfolioItemParentModel,
                     portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
                     typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task'],
+                    parentFilters: parentFilters,
                     listeners: {
                         statusupdate: function(done, total){
                             console.log('app status update', done, total);
@@ -400,7 +464,10 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                             scope: this
                         });
                     },
-                    failure: function(){},
+                    failure: function(msg){
+                        me._deleteArtifacts();
+                        me.fireEvent('copyerror',msg);
+                    },
                     scope: me
                 });
             },
@@ -410,7 +477,58 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             scope: this
         });
     },
+    _deleteArtifacts: function(){
+        this.logger.log('_deleteArtifacts');
+        var tasks = [],
+            artifacts = [];
 
+        _.each(this.tree, function(artifact, oid) {
+            //first we need to delete tasks
+            if (artifact.copyRecord) {
+                if (artifact.copyRecord.get('_type').toLowerCase() === 'task') {
+                    tasks.push(artifact);
+                } else {
+                    artifacts.push(artifact);
+                }
+            }
+        });
+
+        var promises = [];
+        _.each(tasks, function(t){
+            promises.push(function(){ return this._deleteArtifact(t)});
+        }, this);
+        _.each(artifacts, function(a){
+            promises.push(function(){ return this._deleteArtifact(a)});
+        }, this);
+
+
+        Deft.Chain.sequence(promises, this).then({
+            success: function(){
+                this.logger.log('artifacts deleted');
+            },
+            scope: this
+        });
+    },
+    _deleteArtifact: function(artifact){
+        var deferred = Ext.create('Deft.Deferred');
+
+        artifact.deleted = false;
+        if (artifact.copyRecord){
+            var fid = artifact.copyRecord.get('FormattedID');
+            artifact.copyRecord.destroy({
+                callback: function(result, operation){
+                    this.logger.log('artifact deleted',fid, operation.wasSuccessful(), result, operation);
+                    if (operation.wasSuccessful()){
+                        artifact.copyRecord = null;
+                        artifact.deleted = true;
+                    }
+                    deferred.resolve();
+                },
+                scope: this
+            });
+        }
+        return deferred;
+    },
     _copyStandaloneArtifacts: function(overrides){
         this.logger.log('_copyStandaloneArtifacts', overrides);
         var promises = [],
@@ -550,7 +668,6 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                             this.tree[artifactOid].error = operation.error.errors.join(',');
                             deferred.reject(operation.error.errors.join(','));
                         }
-
                     },
                     scope: this
                 });
@@ -775,6 +892,64 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
 });
 
+Ext.define('Rally.technicalservices.CatalogCombobox',{
+    extend: 'Rally.ui.combobox.ComboBox',
+    alias: 'widget.rallycatalogcombobox',
+
+    config: {
+        name: 'Catalog Items',
+
+        storeConfig: {
+            fetch: ["Name", "ObjectID", "FormattedID"],
+            remoteFilter: true,
+            autoLoad: true
+        },
+
+        listConfig: {
+            emptyText: 'No Items to select from',
+            minWidth: 500
+        },
+        width: 500,
+        minWidth: 500,
+        matchFieldWidth: true,
+        queryMode: 'local',
+        showArrows: true
+
+    },
+
+    constructor: function(config) {
+        this.mergeConfig(config);
+
+        this.plugins = (this.plugins || []);
+        this.plugins.push({
+            ptype: 'rallycomboboxpreviousnextarrows',
+            arrowUserAction: 'Program change via arrow button'
+        });
+
+        this.callParent([this.config]);
+
+        if (this.comboBoxPreviousNextArrowsPlugin) {
+            if (this.rendered) {
+                this.comboBoxPreviousNextArrowsPlugin.enableDisableArrows();
+            } else {
+                this.on('afterrender', function() {
+                    this.comboBoxPreviousNextArrowsPlugin.enableDisableArrows();
+                }, this);
+            }
+        }
+    },
+
+    setDefaultValue: function() {
+        this.callParent(arguments);
+        if(this.isDestroyed) {
+            return;
+        }
+
+
+            this.setValue(this.store.getAt(0).get(this.valueField));
+
+    }
+});
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
@@ -1117,9 +1292,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
      _onBulkCopyToParentClicked: function() {
         var records = this.records,
             me = this;
-        console.log('_showParentPicker');
-        //todo add filters so that records cannot be copied to children of the template portfolio item
-
+         
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
             artifactTypes: [this.portfolioItemType.toLowerCase()],
             autoShow: true,
@@ -1131,7 +1304,8 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
                     workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace()),
 
                 },
-                fetch: ['FormattedID','Name','Project']
+                fetch: ['FormattedID','Name','Project'],
+                filters: this.parentFilters
             },
             autoShow: true,
             columns: [
@@ -1154,6 +1328,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     },
     _copyRecord: function(record, parent){
         var deferred = Ext.create('Deft.Deferred');
+        var fid = record.get('FormattedID');
 
         var artifactTree = Ext.create('Rally.technicalservices.ArtifactTree',{
             portfolioItemTypes: this.portfolioItemTypes,
@@ -1162,12 +1337,14 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
                      tree.deepCopy(parent);
                 },
                 copycompleted: function(rootRecord){
-                    deferred.resolve(rootRecord);
+                    deferred.resolve({record: record});
                 },
                 copyerror: function(errorMsg){
-                    deferred.resolve(errorMsg);
+                    deferred.resolve({record: record, errorMessage: errorMsg});
                 },
                 statusupdate: function(done, total){
+                    Rally.ui.notify.Notifier.showStatus({message:Ext.String.format("{0}: {1} of {2} Artifacts copied...", fid, done, total)});
+
                     this.fireEvent('statusupdate',done,total);
                 },
                 scope: this
@@ -1191,18 +1368,19 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             success: function(results){
                 var errorMessage = '';
                 _.each(results, function(r){
-                    if (Ext.isString(r)){
-                        errorMessage = r;
-                        unsuccessfulRecords.push(r);
+                    if (r.errorMessage){
+                        errorMessage = r.errorMessage;
+                        unsuccessfulRecords.push(r.record);
                     } else {
-                        successfulRecords.push(r);
+                        successfulRecords.push(r.record);
                     }
                 });
+
                 this.onSuccess(successfulRecords, unsuccessfulRecords, {parent: parent}, errorMessage);
-                console.log('success',successfulRecords, unsuccessfulRecords, errorMessage);
             },
             failure: function(msg){
 
+                this.onSuccess([], [], {parent: parent}, msg);
             },
             scope: this
         });
@@ -1211,13 +1389,17 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     onSuccess: function (successfulRecords, unsuccessfulRecords, args, errorMessage) {
 
         var formattedID = args && args.parent.get('FormattedID'),
-            message = successfulRecords.length + (successfulRecords.length === 1 ? ' item has' : ' items have');
+            message = successfulRecords.length + (successfulRecords.length === 1 ? ' item has ' : ' items have ');
 
         if(successfulRecords.length === this.records.length) {
             Rally.ui.notify.Notifier.show({
                 message: message +  'been deep copied to ' + formattedID
             });
         } else {
+            if (successfulRecords.length === 0){
+                message = "0 items have been copied"
+            }
+
             Rally.ui.notify.Notifier.showWarning({
                 message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage
             });

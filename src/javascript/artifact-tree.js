@@ -63,7 +63,10 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                             scope: this
                         });
                     },
-                    failure: function(){},
+                    failure: function(msg){
+                        me._deleteArtifacts();
+                        me.fireEvent('copyerror',msg);
+                    },
                     scope: me
                 });
             },
@@ -73,7 +76,58 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             scope: this
         });
     },
+    _deleteArtifacts: function(){
+        this.logger.log('_deleteArtifacts');
+        var tasks = [],
+            artifacts = [];
 
+        _.each(this.tree, function(artifact, oid) {
+            //first we need to delete tasks
+            if (artifact.copyRecord) {
+                if (artifact.copyRecord.get('_type').toLowerCase() === 'task') {
+                    tasks.push(artifact);
+                } else {
+                    artifacts.push(artifact);
+                }
+            }
+        });
+
+        var promises = [];
+        _.each(tasks, function(t){
+            promises.push(function(){ return this._deleteArtifact(t)});
+        }, this);
+        _.each(artifacts, function(a){
+            promises.push(function(){ return this._deleteArtifact(a)});
+        }, this);
+
+
+        Deft.Chain.sequence(promises, this).then({
+            success: function(){
+                this.logger.log('artifacts deleted');
+            },
+            scope: this
+        });
+    },
+    _deleteArtifact: function(artifact){
+        var deferred = Ext.create('Deft.Deferred');
+
+        artifact.deleted = false;
+        if (artifact.copyRecord){
+            var fid = artifact.copyRecord.get('FormattedID');
+            artifact.copyRecord.destroy({
+                callback: function(result, operation){
+                    this.logger.log('artifact deleted',fid, operation.wasSuccessful(), result, operation);
+                    if (operation.wasSuccessful()){
+                        artifact.copyRecord = null;
+                        artifact.deleted = true;
+                    }
+                    deferred.resolve();
+                },
+                scope: this
+            });
+        }
+        return deferred;
+    },
     _copyStandaloneArtifacts: function(overrides){
         this.logger.log('_copyStandaloneArtifacts', overrides);
         var promises = [],
@@ -213,7 +267,6 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                             this.tree[artifactOid].error = operation.error.errors.join(',');
                             deferred.reject(operation.error.errors.join(','));
                         }
-
                     },
                     scope: this
                 });
