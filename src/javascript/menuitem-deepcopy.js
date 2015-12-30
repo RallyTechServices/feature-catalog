@@ -30,9 +30,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
      _onBulkCopyToParentClicked: function() {
         var records = this.records,
             me = this;
-
-        //todo add filters so that records cannot be copied to children of the template portfolio item
-
+         
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
             artifactTypes: [this.portfolioItemType.toLowerCase()],
             autoShow: true,
@@ -44,7 +42,8 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
                     workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace()),
 
                 },
-                fetch: ['FormattedID','Name','Project']
+                fetch: ['FormattedID','Name','Project'],
+                filters: this.parentFilters
             },
             autoShow: true,
             columns: [

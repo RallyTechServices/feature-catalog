@@ -62,6 +62,15 @@ Ext.define("feature-catalog", {
 
         this.logger.log('_addSecondLevelPicker', parentType, types);
         var idx = _.indexOf(types, parentType);
+
+        var parentFiltersProperty = _.range(idx-1).map(function(p){return "Parent";}).join("."),
+            parentFilters = [{
+                property: parentFiltersProperty,
+                operator: "!=",
+                value: parentPortfolioItem
+            }];
+
+
         if (idx > 2){
             var property = _.range(idx-2).map(function(p){return "Parent";}).join(".");
             this.logger.log('property', types, property, types[idx-1]);
@@ -73,14 +82,6 @@ Ext.define("feature-catalog", {
                 operator: '>',
                 value: 0
             }];
-            //
-            //var cbStore = Ext.create('Rally.data.wsapi.Store',{
-            //    model: types[idx-1],
-            //    filters: filters,
-            //    fetch: ["Name","ObjectID"]
-            //});
-            //
-            //cbStore.load();
 
             this.down('#selector_box').add({
                 xtype: 'rallycatalogcombobox',
@@ -100,7 +101,7 @@ Ext.define("feature-catalog", {
                         this.logger.log('Parent.Parent Combo change', cb.getRecord());
                         if (cb.getValue()){
                             var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
-                            this._addFeatureGrid(store);
+                            this._addFeatureGrid(store, parentFilters);
                         }
                     }
                 }
@@ -108,7 +109,7 @@ Ext.define("feature-catalog", {
 
         } else {
             var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
-            this._addFeatureGrid(store);
+            this._addFeatureGrid(store,parentFilters);
         }
     },
     _loadFeatureStore: function(parentPortfolioItem){
@@ -139,7 +140,7 @@ Ext.define("feature-catalog", {
         return store;
     },
 
-    _addFeatureGrid: function(store){
+    _addFeatureGrid: function(store, parentFilters){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
@@ -167,6 +168,7 @@ Ext.define("feature-catalog", {
                     portfolioItemType: portfolioItemParentModel,
                     portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
                     typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task'],
+                    parentFilters: parentFilters,
                     listeners: {
                         statusupdate: function(done, total){
                             console.log('app status update', done, total);
