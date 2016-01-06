@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Dec 29 2015 18:05:15 GMT-0700 (MST) -->
+    <!--  Build Date: Tue Jan 05 2016 17:35:49 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Dec 29 2015 18:05:15 GMT-0700 (MST)";
-        var CHECKSUM = 62897690206;
+        var APP_BUILD_DATE = "Tue Jan 05 2016 17:35:49 GMT-0700 (MST)";
+        var CHECKSUM = 62967926184;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -357,7 +357,8 @@ Ext.define("feature-catalog", {
             context: this.getContext(),
             features: [{
                 ftype: 'groupingsummary',
-                groupHeaderTpl: '{name} ({rows.length})'
+                groupHeaderTpl: '{name} ({rows.length})',
+                startCollapsed: true
             }],
             enableBulkEdit: true
         });
@@ -1292,7 +1293,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
      _onBulkCopyToParentClicked: function() {
         var records = this.records,
             me = this;
-         
+
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
             artifactTypes: [this.portfolioItemType.toLowerCase()],
             autoShow: true,

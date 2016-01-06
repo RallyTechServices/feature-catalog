@@ -179,7 +179,8 @@ Ext.define("feature-catalog", {
             context: this.getContext(),
             features: [{
                 ftype: 'groupingsummary',
-                groupHeaderTpl: '{name} ({rows.length})'
+                groupHeaderTpl: '{name} ({rows.length})',
+                startCollapsed: true
             }],
             enableBulkEdit: true
         });

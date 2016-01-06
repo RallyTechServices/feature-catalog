@@ -30,7 +30,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
      _onBulkCopyToParentClicked: function() {
         var records = this.records,
             me = this;
-         
+
         Ext.create("Rally.ui.dialog.ArtifactChooserDialog", {
             artifactTypes: [this.portfolioItemType.toLowerCase()],
             autoShow: true,
