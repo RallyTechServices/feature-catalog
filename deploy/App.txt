@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Tue Jan 05 2016 17:35:49 GMT-0700 (MST) -->
+    <!--  Build Date: Sun Jan 17 2016 15:22:12 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Tue Jan 05 2016 17:35:49 GMT-0700 (MST)";
-        var CHECKSUM = 62967926184;
+        var APP_BUILD_DATE = "Sun Jan 17 2016 15:22:12 GMT-0700 (MST)";
+        var CHECKSUM = 67010690974;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -278,16 +278,16 @@ Ext.define("feature-catalog", {
                     change: function(cb){
                         this.logger.log('Parent.Parent Combo change', cb.getRecord());
                         if (cb.getValue()){
-                            var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
-                            this._addFeatureGrid(store, parentFilters);
+                           // var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
+                            this._addFeatureGrid(cb.getRecord().get('_ref'), parentFilters);
                         }
                     }
                 }
             });
 
         } else {
-            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
-            this._addFeatureGrid(store,parentFilters);
+           // var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
+            this._addFeatureGrid(this.getCatalogPortfolioItem(),parentFilters);
         }
     },
     _loadFeatureStore: function(parentPortfolioItem){
@@ -309,7 +309,7 @@ Ext.define("feature-catalog", {
             groupField: 'Parent',
             groupDir: 'ASC',
             filters: filters,
-            fetch: ['FormattedID','Name','Parent'],
+            fetch: ['FormattedID','Name','Project','Parent'],
             getGroupString: function(record) {
                 var parent = record.get('Parent');
                 return (parent && parent._refObjectName) || 'No Parent';
@@ -318,21 +318,46 @@ Ext.define("feature-catalog", {
         return store;
     },
 
-    _addFeatureGrid: function(store, parentFilters){
+    _addFeatureGrid: function(parentPortfolioItemRef, parentFilters){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
 
+        if (this.down('rallygrid')){
+            this.down('rallygrid').destroy();
+        }
+
+        //todo: make this adapatable to the type of portfolio item chosen
+        var filters = [{
+            property: 'Parent.Parent',
+            operator: '=',
+            value: parentPortfolioItemRef
+        }];
 
         this.down('#display_box').removeAll();
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
         this.down('#display_box').add({
             xtype: 'rallygrid',
-            store: store,
+            model: this.portfolioItemTypes[0].typePath,
+            //store: store,
+            storeConfig: {
+                model: this.portfolioItemTypes[0].typePath,
+                groupField: 'Parent',
+                groupDir: 'ASC',
+                filters: filters,
+                fetch: ['FormattedID','Name','Project','Parent'],
+                getGroupString: function(record) {
+                    var parent = record.get('Parent');
+                    return (parent && parent._refObjectName) || 'No Parent';
+                },
+                pageSize: 200
+            },
+            pageSize: 200,
             columnCfgs: [
                 'FormattedID',
-                'Name'
+                'Name',
+                'Project'
             ],
             plugins: [{
                 ptype: 'tsgridfieldpicker',
@@ -360,7 +385,12 @@ Ext.define("feature-catalog", {
                 groupHeaderTpl: '{name} ({rows.length})',
                 startCollapsed: true
             }],
-            enableBulkEdit: true
+            enableBulkEdit: true,
+            listeners: {
+                fieldsupdated: function(fields){
+                    this.reconfigureWithColumns(fields);
+                }
+            }
         });
     },
     _copyToParent: function(records, parent){
@@ -1409,6 +1439,27 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
         Ext.callback(this.onActionComplete, null, [successfulRecords, unsuccessfulRecords]);
     }
 });
+/**
+ * Created by kcorkan on 1/6/16.
+ */
+Ext.override(Ext.grid.feature.Grouping, {
+
+    onReconfigure: function(grid, store, columns, oldStore, oldColumns) {
+        var me = grid;
+        if (store && store !== oldStore) {
+            // Grouping involves injecting a dataSource in early
+            if (oldStore && store.buffered !== oldStore.buffered) {
+                Ext.Error.raise('Cannot reconfigure grouping switching between buffered and non-buffered stores');
+            }
+            if (store.buffered) {
+                me.bindStore(store);
+                me.dataSource.processStore(store);
+            }
+        }
+    }
+
+});
+
 (function () {
     var Ext = window.Ext4 || window.Ext;
 

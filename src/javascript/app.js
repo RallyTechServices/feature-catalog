@@ -100,16 +100,16 @@ Ext.define("feature-catalog", {
                     change: function(cb){
                         this.logger.log('Parent.Parent Combo change', cb.getRecord());
                         if (cb.getValue()){
-                            var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
-                            this._addFeatureGrid(store, parentFilters);
+                           // var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
+                            this._addFeatureGrid(cb.getRecord().get('_ref'), parentFilters);
                         }
                     }
                 }
             });
 
         } else {
-            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
-            this._addFeatureGrid(store,parentFilters);
+           // var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
+            this._addFeatureGrid(this.getCatalogPortfolioItem(),parentFilters);
         }
     },
     _loadFeatureStore: function(parentPortfolioItem){
@@ -131,7 +131,7 @@ Ext.define("feature-catalog", {
             groupField: 'Parent',
             groupDir: 'ASC',
             filters: filters,
-            fetch: ['FormattedID','Name','Parent'],
+            fetch: ['FormattedID','Name','Project','Parent'],
             getGroupString: function(record) {
                 var parent = record.get('Parent');
                 return (parent && parent._refObjectName) || 'No Parent';
@@ -140,21 +140,46 @@ Ext.define("feature-catalog", {
         return store;
     },
 
-    _addFeatureGrid: function(store, parentFilters){
+    _addFeatureGrid: function(parentPortfolioItemRef, parentFilters){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
 
+        if (this.down('rallygrid')){
+            this.down('rallygrid').destroy();
+        }
+
+        //todo: make this adapatable to the type of portfolio item chosen
+        var filters = [{
+            property: 'Parent.Parent',
+            operator: '=',
+            value: parentPortfolioItemRef
+        }];
 
         this.down('#display_box').removeAll();
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
         this.down('#display_box').add({
             xtype: 'rallygrid',
-            store: store,
+            model: this.portfolioItemTypes[0].typePath,
+            //store: store,
+            storeConfig: {
+                model: this.portfolioItemTypes[0].typePath,
+                groupField: 'Parent',
+                groupDir: 'ASC',
+                filters: filters,
+                fetch: ['FormattedID','Name','Project','Parent'],
+                getGroupString: function(record) {
+                    var parent = record.get('Parent');
+                    return (parent && parent._refObjectName) || 'No Parent';
+                },
+                pageSize: 200
+            },
+            pageSize: 200,
             columnCfgs: [
                 'FormattedID',
-                'Name'
+                'Name',
+                'Project'
             ],
             plugins: [{
                 ptype: 'tsgridfieldpicker',
@@ -182,7 +207,12 @@ Ext.define("feature-catalog", {
                 groupHeaderTpl: '{name} ({rows.length})',
                 startCollapsed: true
             }],
-            enableBulkEdit: true
+            enableBulkEdit: true,
+            listeners: {
+                fieldsupdated: function(fields){
+                    this.reconfigureWithColumns(fields);
+                }
+            }
         });
     },
     _copyToParent: function(records, parent){

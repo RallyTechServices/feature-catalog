@@ -1,5 +1,36 @@
 #Feature Catalog Selector
 
+This app presents a catalog of features (lowest level portfolio items) available to copy to a parent portfolio item in bulk.
+
+![ScreenShot](/images/feature-catalog.png)  
+  
+The scenario for this app is that an ancestor portfolio item contains a hierarchy of "template" portfolio items that are commonly 
+used.  
+
+If the ancestor portfolio item is more than 2 levels above the lowest level portfolio item, then a dropdown box will be available 
+above the grid to browse all features for the selected 3rd level portfolio item.  
+
+The grid of available features to be copied will be grouped by their parent portfolio items.
+
+This app provides a way to select and copy those items in bulk to a new parent.  
+
+To copy features to a parent, select the feature(s) to copy, right click on the gear and select Copy to Parent....
+
+A copy of the selected feature(s) and all child stories and tasks will be copied to the selected parent.  
+
+If a feature or any of its children fail to copy, the app will attempt to "cleanup" the copied feature by deleting all artifacts 
+within that feature that were successfully copied during the transaction.
+
+
+###App Configuration
+
+A parent/grandparent/great-grandparent portfolio item is configured in the app settings.  This portfolio item contains all template
+portfolio items below it.  The lowest level portfolio items are available for copy to a parent.  The mid-level portfolio items 
+are used as means to organize and browse the catalog.  
+
+![ScreenShot](/images/feature-catalog-settings.png)
+
+
 ## Development Notes
 
 ### First Load
