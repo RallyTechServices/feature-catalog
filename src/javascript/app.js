@@ -100,16 +100,16 @@ Ext.define("feature-catalog", {
                     change: function(cb){
                         this.logger.log('Parent.Parent Combo change', cb.getRecord());
                         if (cb.getValue()){
-                            var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
-                            this._addFeatureGrid(store, parentFilters);
+                           // var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
+                            this._addFeatureGrid(cb.getRecord(), parentFilters);
                         }
                     }
                 }
             });
 
         } else {
-            var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
-            this._addFeatureGrid(store,parentFilters);
+           // var store = this._loadFeatureStore(this.getCatalogPortfolioItem());
+            this._addFeatureGrid(this.getCatalogPortfolioItem(),parentFilters);
         }
     },
     _loadFeatureStore: function(parentPortfolioItem){
@@ -131,7 +131,7 @@ Ext.define("feature-catalog", {
             groupField: 'Parent',
             groupDir: 'ASC',
             filters: filters,
-            fetch: ['FormattedID','Name','Parent'],
+            fetch: ['FormattedID','Name','Project','Parent'],
             getGroupString: function(record) {
                 var parent = record.get('Parent');
                 return (parent && parent._refObjectName) || 'No Parent';
@@ -140,21 +140,46 @@ Ext.define("feature-catalog", {
         return store;
     },
 
-    _addFeatureGrid: function(store, parentFilters){
+    _addFeatureGrid: function(parentPortfolioItemRecord, parentFilters){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
 
+        if (this.down('rallygrid')){
+            this.down('rallygrid').destroy();
+        }
+
+        //todo: make this adapatable to the type of portfolio item chosen
+        var filters = [{
+            property: 'Parent.Parent',
+            operator: '=',
+            value: parentPortfolioItemRecord.get('_ref')
+        }];
 
         this.down('#display_box').removeAll();
         this.logger.log('_addFeatureGrid', portfolioItemModel, portfolioItemParentModel);
 
         this.down('#display_box').add({
             xtype: 'rallygrid',
-            store: store,
+            model: this.portfolioItemTypes[0].typePath,
+            //store: store,
+            storeConfig: {
+                model: this.portfolioItemTypes[0].typePath,
+                groupField: 'Parent',
+                groupDir: 'ASC',
+                filters: filters,
+                fetch: ['FormattedID','Name','Project','Parent'],
+                getGroupString: function(record) {
+                    var parent = record.get('Parent');
+                    return (parent && parent._refObjectName) || 'No Parent';
+                },
+                pageSize: 200
+            },
+            pageSize: 200,
             columnCfgs: [
                 'FormattedID',
-                'Name'
+                'Name',
+                'Project'
             ],
             plugins: [{
                 ptype: 'tsgridfieldpicker',
@@ -169,6 +194,10 @@ Ext.define("feature-catalog", {
                     portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
                     typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task'],
                     parentFilters: parentFilters,
+                    grandparentID: parentPortfolioItemRecord.get('FormattedID'),
+                    level1TemplateField: this.getSetting('level1TemplateField') || null,
+                    level2TemplateField: this.getSetting('level2TemplateField') || null,
+                    level3TemplateField: this.getSetting('level3TemplateField') || null,
                     listeners: {
                         statusupdate: function(done, total){
                             console.log('app status update', done, total);
@@ -179,20 +208,59 @@ Ext.define("feature-catalog", {
             context: this.getContext(),
             features: [{
                 ftype: 'groupingsummary',
-                groupHeaderTpl: '{name} ({rows.length})'
+                groupHeaderTpl: '{name} ({rows.length})',
+                startCollapsed: true
             }],
-            enableBulkEdit: true
+            enableBulkEdit: true,
+            listeners: {
+                fieldsupdated: function(fields){
+                    this.reconfigureWithColumns(fields);
+                }
+            }
         });
     },
     _copyToParent: function(records, parent){
         this.logger.log('_copyToParent', records, parent);
     },
     getSettingsFields: function(){
-        return [{
-            xtype: 'chartportfolioitempicker',
-            name: 'catalogPortfolioItem',
-            fieldLabel: ''
-        }];
+
+        var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
+            fields = [],
+            width = 500,
+            labelWidth = 150;
+
+        if (model){
+            fields = [{
+                xtype: 'rallyfieldcombobox',
+                name: 'level3TemplateField',
+                fieldLabel: 'FCID01 Capability Field',
+                model: model,
+                width: width,
+                labelWidth: labelWidth
+            }, {
+                xtype: 'rallyfieldcombobox',
+                name: 'level2TemplateField',
+                fieldLabel: 'FCID02 Feature Field',
+                model: model,
+                width: width,
+                labelWidth: labelWidth
+            }, {
+                xtype: 'rallyfieldcombobox',
+                name: 'level1TemplateField',
+                fieldLabel: 'FCID03 Sub-Feature Field',
+                model: model,
+                width: width,
+                labelWidth: labelWidth
+            }];
+        }
+         fields.push({
+                    xtype: 'chartportfolioitempicker',
+                    name: 'catalogPortfolioItem',
+                    fieldLabel: '',
+                    margin: '25 0 0 0'
+                });
+
+        return fields;
     },
 
     getOptions: function() {
