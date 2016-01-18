@@ -70,6 +70,9 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
 
         var artifactTree = Ext.create('Rally.technicalservices.ArtifactTree',{
             portfolioItemTypes: this.portfolioItemTypes,
+            level1TemplateField: this.level1TemplateField,
+            level2TemplateField: this.level2TemplateField,
+            level3TemplateField: this.level3TemplateField,
             listeners: {
                 treeloaded: function(tree){
                      tree.deepCopy(parent);
@@ -88,7 +91,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
                 scope: this
             }
         });
-        artifactTree.load(record);
+        artifactTree.load(record, record.get('Parent').FormattedID, this.grandparentID);
 
         return deferred;
     },

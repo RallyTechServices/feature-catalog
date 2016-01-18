@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jan 17 2016 15:22:12 GMT-0700 (MST) -->
+    <!--  Build Date: Sun Jan 17 2016 18:08:42 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jan 17 2016 15:22:12 GMT-0700 (MST)";
-        var CHECKSUM = 67010690974;
+        var APP_BUILD_DATE = "Sun Jan 17 2016 18:08:42 GMT-0700 (MST)";
+        var CHECKSUM = 72959578955;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -279,7 +279,7 @@ Ext.define("feature-catalog", {
                         this.logger.log('Parent.Parent Combo change', cb.getRecord());
                         if (cb.getValue()){
                            // var store = this._loadFeatureStore(cb.getRecord().get('_ref'));
-                            this._addFeatureGrid(cb.getRecord().get('_ref'), parentFilters);
+                            this._addFeatureGrid(cb.getRecord(), parentFilters);
                         }
                     }
                 }
@@ -318,7 +318,7 @@ Ext.define("feature-catalog", {
         return store;
     },
 
-    _addFeatureGrid: function(parentPortfolioItemRef, parentFilters){
+    _addFeatureGrid: function(parentPortfolioItemRecord, parentFilters){
         var portfolioItemModel = this.portfolioItemTypes[0].typePath.toLowerCase(),
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             me = this;
@@ -331,7 +331,7 @@ Ext.define("feature-catalog", {
         var filters = [{
             property: 'Parent.Parent',
             operator: '=',
-            value: parentPortfolioItemRef
+            value: parentPortfolioItemRecord.get('_ref')
         }];
 
         this.down('#display_box').removeAll();
@@ -372,6 +372,10 @@ Ext.define("feature-catalog", {
                     portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
                     typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task'],
                     parentFilters: parentFilters,
+                    grandparentID: parentPortfolioItemRecord.get('FormattedID'),
+                    level1TemplateField: this.getSetting('level1TemplateField') || null,
+                    level2TemplateField: this.getSetting('level2TemplateField') || null,
+                    level3TemplateField: this.getSetting('level3TemplateField') || null,
                     listeners: {
                         statusupdate: function(done, total){
                             console.log('app status update', done, total);
@@ -397,11 +401,44 @@ Ext.define("feature-catalog", {
         this.logger.log('_copyToParent', records, parent);
     },
     getSettingsFields: function(){
-        return [{
-            xtype: 'chartportfolioitempicker',
-            name: 'catalogPortfolioItem',
-            fieldLabel: ''
-        }];
+
+        var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
+            fields = [],
+            width = 500,
+            labelWidth = 150;
+
+        if (model){
+            fields = [{
+                xtype: 'rallyfieldcombobox',
+                name: 'level3TemplateField',
+                fieldLabel: 'FCID01 Capability Field',
+                model: model,
+                width: width,
+                labelWidth: labelWidth
+            }, {
+                xtype: 'rallyfieldcombobox',
+                name: 'level2TemplateField',
+                fieldLabel: 'FCID02 Feature Field',
+                model: model,
+                width: width,
+                labelWidth: labelWidth
+            }, {
+                xtype: 'rallyfieldcombobox',
+                name: 'level1TemplateField',
+                fieldLabel: 'FCID03 Sub-Feature Field',
+                model: model,
+                width: width,
+                labelWidth: labelWidth
+            }];
+        }
+         fields.push({
+                    xtype: 'chartportfolioitempicker',
+                    name: 'catalogPortfolioItem',
+                    fieldLabel: '',
+                    margin: '25 0 0 0'
+                });
+
+        return fields;
     },
 
     getOptions: function() {
@@ -454,14 +491,21 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.parentChildTypeMap = this._setupParentChildMap(config.portfolioItemTypes);
         this.modelHash = {};
 
+        this.level1TemplateField = config.level1TemplateField || null;
+        this.level2TemplateField = config.level2TemplateField || null;
+        this.level3TemplateField = config.level3TemplateField || null;
+
         this.mixins.observable.constructor.call(this, config);
 
     },
-    load: function(rootArtifact){
+    load: function(rootArtifact, rootParent, rootGrandparent){
         this.totalRecords = 1;
         this.tree = {};
         this.stoppedByError = false;
         this.rootArtifact = rootArtifact;
+        this.rootParent = rootParent;
+        this.rootGrandparent = rootGrandparent;
+
         this._loadModel(rootArtifact);
     },
     _updateStatus: function(){
@@ -474,7 +518,18 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.completedArtifacts = 0;
 
         this.fireEvent('statusupdate', 0, this.totalArtifacts);
-        me._copyStandaloneArtifacts({PortfolioItem: "", Parent: ""}).then({
+        var overrides = {PortfolioItem: "", Parent: ""};
+        if (this.level1TemplateField){
+            overrides[this.level1TemplateField] = this.rootGrandparent;
+        }
+        if (this.level2TemplateField){
+            overrides[this.level2TemplateField] = this.rootParent;
+        }
+        if (this.level3TemplateField) {
+            overrides[this.level3TemplateField] = this.rootArtifact.get('FormattedID');
+        }
+        this.logger.log('deepCopy.overrides',overrides);
+        me._copyStandaloneArtifacts(overrides).then({
             success: function(){
                 this.logger.log('deepCopy. _copyStandaloneArtifacts success');
                 Deft.Chain.sequence([
@@ -1363,6 +1418,9 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
 
         var artifactTree = Ext.create('Rally.technicalservices.ArtifactTree',{
             portfolioItemTypes: this.portfolioItemTypes,
+            level1TemplateField: this.level1TemplateField,
+            level2TemplateField: this.level2TemplateField,
+            level3TemplateField: this.level3TemplateField,
             listeners: {
                 treeloaded: function(tree){
                      tree.deepCopy(parent);
@@ -1381,7 +1439,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
                 scope: this
             }
         });
-        artifactTree.load(record);
+        artifactTree.load(record, record.get('Parent').FormattedID, this.grandparentID);
 
         return deferred;
     },

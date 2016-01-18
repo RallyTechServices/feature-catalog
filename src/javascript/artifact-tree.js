@@ -22,14 +22,21 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.parentChildTypeMap = this._setupParentChildMap(config.portfolioItemTypes);
         this.modelHash = {};
 
+        this.level1TemplateField = config.level1TemplateField || null;
+        this.level2TemplateField = config.level2TemplateField || null;
+        this.level3TemplateField = config.level3TemplateField || null;
+
         this.mixins.observable.constructor.call(this, config);
 
     },
-    load: function(rootArtifact){
+    load: function(rootArtifact, rootParent, rootGrandparent){
         this.totalRecords = 1;
         this.tree = {};
         this.stoppedByError = false;
         this.rootArtifact = rootArtifact;
+        this.rootParent = rootParent;
+        this.rootGrandparent = rootGrandparent;
+
         this._loadModel(rootArtifact);
     },
     _updateStatus: function(){
@@ -42,7 +49,18 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.completedArtifacts = 0;
 
         this.fireEvent('statusupdate', 0, this.totalArtifacts);
-        me._copyStandaloneArtifacts({PortfolioItem: "", Parent: ""}).then({
+        var overrides = {PortfolioItem: "", Parent: ""};
+        if (this.level1TemplateField){
+            overrides[this.level1TemplateField] = this.rootGrandparent;
+        }
+        if (this.level2TemplateField){
+            overrides[this.level2TemplateField] = this.rootParent;
+        }
+        if (this.level3TemplateField) {
+            overrides[this.level3TemplateField] = this.rootArtifact.get('FormattedID');
+        }
+        this.logger.log('deepCopy.overrides',overrides);
+        me._copyStandaloneArtifacts(overrides).then({
             success: function(){
                 this.logger.log('deepCopy. _copyStandaloneArtifacts success');
                 Deft.Chain.sequence([
