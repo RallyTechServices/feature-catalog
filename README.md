@@ -24,6 +24,8 @@ within that feature that were successfully copied during the transaction.
 
 ###App Configuration
 
+Configurations to copy the "template" feature, initiative and theme ID are at the top.  Select a custom field to store the template IDs in the copied feature.  
+
 A parent/grandparent/great-grandparent portfolio item is configured in the app settings.  This portfolio item contains all template
 portfolio items below it.  The lowest level portfolio items are available for copy to a parent.  The mid-level portfolio items 
 are used as means to organize and browse the catalog.  
