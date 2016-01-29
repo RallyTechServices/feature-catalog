@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Jan 17 2016 18:08:42 GMT-0700 (MST) -->
+    <!--  Build Date: Fri Jan 29 2016 13:25:45 GMT-0700 (MST) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Jan 17 2016 18:08:42 GMT-0700 (MST)";
-        var CHECKSUM = 72959578955;
+        var APP_BUILD_DATE = "Fri Jan 29 2016 13:25:45 GMT-0700 (MST)";
+        var CHECKSUM = 72959571156;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -1418,9 +1418,9 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
 
         var artifactTree = Ext.create('Rally.technicalservices.ArtifactTree',{
             portfolioItemTypes: this.portfolioItemTypes,
-            level1TemplateField: this.level1TemplateField,
+            level1TemplateField: this.level3TemplateField,
             level2TemplateField: this.level2TemplateField,
-            level3TemplateField: this.level3TemplateField,
+            level3TemplateField: this.level1TemplateField,
             listeners: {
                 treeloaded: function(tree){
                      tree.deepCopy(parent);
