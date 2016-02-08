@@ -29,15 +29,24 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.mixins.observable.constructor.call(this, config);
 
     },
-    load: function(rootArtifact, rootParent, rootGrandparent){
+    load: function(rootArtifact, rootParent){
         this.totalRecords = 1;
         this.tree = {};
         this.stoppedByError = false;
         this.rootArtifact = rootArtifact;
-        this.rootParent = rootParent;
-        this.rootGrandparent = rootGrandparent;
-
-        this._loadModel(rootArtifact);
+        this.rootParent = rootParent && rootParent.FormattedID  || null;
+        if (rootParent && this.level1TemplateField){
+            this._fetchGrandparent(rootParent).then({
+                success: function(grandparent){
+                    this.rootGrandparent = grandparent;
+                    this._loadModel(rootArtifact);
+                },
+                scope: this
+            });
+        } else {
+            this.rootGrandparent = null;
+            this._loadModel(rootArtifact);
+        }
     },
     _updateStatus: function(){
         this.fireEvent('statusupdate', this.completedArtifacts, this.totalArtifacts);
@@ -505,6 +514,27 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             }
         }
         return parentChildTypeMap;
-    }
+    },
+    _fetchGrandparent: function(parentObj){
+        var deferred = Ext.create('Deft.Deferred');
 
+        Ext.create('Rally.data.wsapi.Store',{
+            model: parentObj._type,
+            fetch: ['Parent','FormattedID'],
+            filters: [{
+                property: 'FormattedID',
+                value: parentObj.FormattedID
+            }]
+        }).load({
+            callback: function(records, operation){
+                if (operation.wasSuccessful()){
+                    deferred.resolve(records[0] && records[0].get('Parent') && records[0].get('Parent').FormattedID);
+                } else {
+                    deferred.reject('Error loading parent record: ' + operation.error.errors.join(','));
+                }
+            }
+        });
+
+        return deferred;
+    }
 });

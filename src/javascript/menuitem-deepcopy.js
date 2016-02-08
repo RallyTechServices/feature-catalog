@@ -4,7 +4,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
 
     config: {
         onBeforeAction: function(){
-            console.log('onbeforeaction');
+//            console.log('onbeforeaction');
         },
 
         /**
@@ -13,7 +13,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
          * @param Rally.data.wsapi.Model[] onActionComplete.unsuccessfulRecords any records which failed to be updated
          */
         onActionComplete: function(){
-            console.log('onActionComplete');
+   //         console.log('onActionComplete');
         },
 
         text: 'Copy to Parent...',
@@ -22,8 +22,10 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             this._onBulkCopyToParentClicked();
         },
         predicate: function (records) {
+            var portfolioItemType = this.typesToCopy[0].toLowerCase();
+
             return _.every(records, function (record) {
-                return record.self.isArtifact() || record.self.isTimebox();
+                return record.get('_type').toLowerCase() === portfolioItemType;
             });
         }
     },
@@ -57,7 +59,6 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             ],
             listeners: {
                 artifactchosen: function(dialog, selectedRecord){
-                    console.log('artifactchosen');
                     me.copyRecords(records, selectedRecord);
                 },
                 scope: me
@@ -85,13 +86,13 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
                 },
                 statusupdate: function(done, total){
                     Rally.ui.notify.Notifier.showStatus({message:Ext.String.format("{0}: {1} of {2} Artifacts copied...", fid, done, total)});
-
                     this.fireEvent('statusupdate',done,total);
                 },
                 scope: this
             }
         });
-        artifactTree.load(record, record.get('Parent').FormattedID, this.grandparentID);
+
+        artifactTree.load(record, record.get('Parent'));
 
         return deferred;
     },
@@ -99,6 +100,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
         var promises= [],
             successfulRecords = [],
             unsuccessfulRecords = [];
+
         _.each(records, function(r){
             promises.push(function() {
                 return this._copyRecord(r, parent);
