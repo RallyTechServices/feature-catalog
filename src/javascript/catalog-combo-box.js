@@ -15,11 +15,12 @@ Ext.define('Rally.technicalservices.CatalogCombobox',{
             emptyText: 'No Items to select from',
             minWidth: 500
         },
-        width: 500,
-        minWidth: 500,
+        //width: 500,
+        //minWidth: 3,
         matchFieldWidth: true,
         queryMode: 'local',
-        showArrows: true
+        showArrows: true,
+        labelAlign: 'right',
 
     },
 
@@ -44,15 +45,11 @@ Ext.define('Rally.technicalservices.CatalogCombobox',{
             }
         }
     },
-
     setDefaultValue: function() {
         this.callParent(arguments);
         if(this.isDestroyed) {
             return;
         }
-
-
-            this.setValue(this.store.getAt(0).get(this.valueField));
-
+        this.setValue(this.store.getAt(0).get(this.valueField));
     }
 });
