@@ -81,7 +81,7 @@ Ext.define("feature-catalog", {
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
             enableHierarchy: true,
-            autoLoad: true,
+            //autoLoad: true,
             fetch: ['FormattedID','Name','Project','Parent','Parent'],
         }).then({
             success: this._createTreeGrid,

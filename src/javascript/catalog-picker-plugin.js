@@ -19,8 +19,7 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
             this.callParent(arguments);
             this.cmp = cmp;
 
-            this.stateId = this.stateId || this.cmp.getContext().getScopedStateId('catalogpicker');
-
+            this.stateId = this.stateId || this.cmp.getContext().getScopedStateId('catalog-picker');
             var state = Ext.state.Manager.get(this.stateId);
 
             this.showControl();
@@ -38,8 +37,7 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                 margin: 5,
                 listeners: {
                     scope: this,
-                    change: me._applyFilter,
-                    ready: me._applyFilter
+                    change: me._applyFilter
                 }
             };
         },
