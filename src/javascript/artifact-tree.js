@@ -17,7 +17,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
     constructor: function(config){
 
-        this.blacklistFields = ['Workspace','Attachments','Tags','Discussion','Milestones','Predecessors','Successors'];
+        this.blacklistFields = ['Workspace','Attachments','Tags','Discussion','Milestones'];
         this.childTypesBlacklist = config.childTypesBlacklist || ['testcase','defectsuite','defect'];
         this.parentChildTypeMap = this._setupParentChildMap(config.portfolioItemTypes);
         this.modelHash = {};
@@ -74,6 +74,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                 this.logger.log('deepCopy. _copyStandaloneArtifacts success');
                 Deft.Chain.sequence([
                     me._copyTasks,
+                    me._updateCollections,
                     me._stitchArtifacts
                 ],me).then({
                     success: function(){
@@ -217,6 +218,78 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
         return deferred;
     },
+    _getNewRefs: function(oldOids, collectionField){
+        var newRefs = [];
+        if (collectionField === 'Predecessors'){
+            _.each(oldOids, function(oid){
+                if (this.tree[oid] && this.tree[oid].copyRecord){
+                    newRefs.push(this.tree[oid].copyRecord.get('_ref'));
+                }
+            }, this);
+        }
+        return newRefs;
+    },
+    _updateCollections: function(){
+        var promises = [],
+            deferred = Ext.create('Deft.Deferred'),
+            collectionFields = ['Predecessors','Tags'];
+
+        _.each(this.tree, function(obj, oid) {
+            _.each(collectionFields, function (cf) {
+                console.log('_updateCollections', obj.record.get('_type'), cf, obj[cf]);
+                if (obj[cf] && obj[cf].length > 0) {
+                    if (cf === 'Predecessors') {
+                        promises.push(function () {
+                            var newRefs = this._getNewRefs(obj[cf], cf)
+                            return this._updateCollection(obj.copyRecord, cf, newRefs);
+                        });
+
+                    } else if (cf === 'Tags') {
+
+                        promises.push(function () {
+                            var newRefs = obj[cf];
+                            return this._updateCollection(obj.copyRecord, cf, newRefs);
+                        });
+                    }
+                }
+            }, this);
+        });
+
+        Deft.Chain.sequence(promises, this).then({
+            success: function(){
+                this.logger.log('_updateCollections success');
+                deferred.resolve();
+            },
+            failure: function(msg){
+                this.logger.log('_updateCollections failed', msg);
+                deferred.reject(msg);
+            },
+            scope: this
+        });
+
+        return deferred;
+    },
+    _updateCollection: function(newArtifact, collectionName, collectionRefs){
+        this.logger.log('_updateCollection', newArtifact, collectionName, collectionRefs);
+
+        var deferred = Ext.create('Deft.Deferred'),
+            store = newArtifact.getCollection(collectionName);
+
+        store.load({
+            callback: function(){
+                Ext.Array.each(collectionRefs, function(cr){
+                    store.add(cr)
+                });
+                store.sync({
+                    callback: function(){
+                        deferred.resolve();
+                    }
+                });
+            }
+        });
+        return deferred;
+    },
+
     _updateArtifact: function(rec){
         var deferred = Ext.create('Deft.Deferred');
         this.logger.log('updateArtifact');
@@ -283,7 +356,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
                 Ext.create(model, fields).save({
                     callback: function(result, operation){
-                        this.logger.log('copyArtifact callback', operation.wasSuccessful(), result, operation);
+                        this.logger.log('copyArtifact callback',artifact.get('FormattedID'), operation.wasSuccessful(), result, operation);
                         if (operation.wasSuccessful()){
                             this.tree[artifactOid].copyRecord = result;
                             this.completedArtifacts++;
@@ -315,25 +388,23 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         _.each(copyableFields, function(f){
 
             //if field is collection and count === 0, then it can be null, otherwise, we need to copy the cooleciton
-            if (f.attributeDefinition.AttributeType === "COLLECTION"){
-                //todo copy collection
-            }
+            if (f.attributeDefinition.AttributeType !== "COLLECTION"){
+                var val = artifactToCopy.get(f.name) || null;
 
-            var val = artifactToCopy.get(f.name) || null;
+                if (val && Ext.isObject(val)){  //If this is a reference field, then we need to use the ObjectId
+                    val = val._ref;
+                }
 
-            if (val && Ext.isObject(val)){  //If this is a reference field, then we need to use the ObjectId
-                val = val._ref;
-            }
-
-            if (_.has(overrideFields, f.name)){
-                val = overrideFields[f.name];
-            }
-            this.logger.log('field', f.name, f.attributeDefinition.AttributeType, val,artifactToCopy.get(f.name));
-            if (val){
-                fieldHash[f.name] = val;
+                if (_.has(overrideFields, f.name)){
+                    val = overrideFields[f.name];
+                }
+                this.logger.log('field', f.name, f.attributeDefinition.AttributeType, val,artifactToCopy.get(f.name));
+                if (val){
+                    fieldHash[f.name] = val;
+                }
             }
         }, this);
-        console.log('fieldHash', fieldHash);
+
         return fieldHash;
     },
     _fieldIsCopyable: function(field){
@@ -383,7 +454,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                 if(operation.wasSuccessful()) {
                     this.logger.log('_loadArtifact success', oid, loadedArtifact);
                     this.tree[oid] = this.getTreeNode(loadedArtifact);
-                    this._loadArtifactChildren(loadedArtifact);
+                    this._loadArtifactCollections(loadedArtifact);
+                    //this._loadArtifactChildren(loadedArtifact);
                 } else {
                     this.logger.log('_loadArtifact failure', oid, operation);
                     var msg = Ext.String.format("Failed to load {0}/{1} with error: {2} ",artifact.get('_type'),artifact.get('ObjectID'),operation.error.errors.join(','));
@@ -395,6 +467,29 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
     },
     getTreeNode: function(artifact){
         return {record: artifact, error: null, childCount: {}};
+    },
+    _loadArtifactCollections: function(artifact){
+        var collectionFields = ['Predecessors','Tags'],
+            promises = [];
+
+        _.each(collectionFields, function(cf){
+            if (artifact.get(cf) && artifact.get(cf).Count && artifact.get(cf).Count > 0){
+                promises.push(this._loadCollection(artifact, cf, false, cf === 'Tags'));
+            }
+        }, this);
+
+        if (promises.length > 0){
+            Deft.Promise.all(promises).then({
+                success: function(){
+                    this.logger.log('artifact collections loaded', artifact);
+                    this._loadArtifactChildren(artifact)
+                },
+                failure: function(){},
+                scope: this
+            });
+        } else {
+            this._loadArtifactChildren(artifact);
+        }
     },
     _loadArtifactChildren: function(artifact){
         if (this.stoppedByError){
@@ -415,7 +510,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             this.logger.log('_loadArtifactChildren child',c, artifact.get(c.collectionName).Count);
             if (artifact.get(c.collectionName).Count > 0){
                 this.totalRecords = this.totalRecords + artifact.get(c.collectionName).Count;
-                this._loadCollection(artifact, c.collectionName);
+                this._loadCollection(artifact, c.collectionName, true);
             }
         }, this);
 
@@ -435,7 +530,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             this.fireEvent('treeloaded', this);
         }
     },
-    _loadCollection: function(artifact, collectionName){
+    _loadCollection: function(artifact, collectionName, loadRecord, preserveRefs){
         var deferred = Ext.create('Deft.Deferred'),
             parentOid = artifact.get('ObjectID');
 
@@ -444,12 +539,20 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         artifact.getCollection(collectionName).load({
             fetch: ['ObjectID'],
             callback: function(records, operation, success) {
+                this.logger.log('_loadCollection callback', collectionName, records, success);
+
                 if (success){
                     _.each(records, function(r){
-                        this.tree[parentOid][collectionName].push(r.get('ObjectID'));
-                        this._loadModel(r);
+                        var val = r.get('ObjectID');
+                        if (preserveRefs){
+                            val = r.get('_ref');
+                        }
+                        this.tree[parentOid][collectionName].push(val);
+                        if (loadRecord){
+                            this._loadModel(r);
+                        }
                     }, this);
-                    this._checkForDoneness();
+                    deferred.resolve();
                 } else {
                     var msg = Ext.String.format("Failed to load collecton for {0}/{1} with error: {2} ",artifact.get('_type'),artifact.get('ObjectID'),operation.error.errors.join(','));
                     this.tree[parentOid].error = msg;

@@ -100,7 +100,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
         var promises= [],
             successfulRecords = [],
             unsuccessfulRecords = [];
-
+        console.log('copyRecords', records.length, records);
         _.each(records, function(r){
             promises.push(function() {
                 return this._copyRecord(r, parent);
