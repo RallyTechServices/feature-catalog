@@ -8,7 +8,8 @@ The scenario for this app is that an ancestor portfolio item contains a hierarch
 used.  
 
 If the ancestor portfolio item is more than 2 levels above the lowest level portfolio item, then a dropdown box will be available 
-above the grid to browse all features for the selected 3rd level portfolio item.  
+above the grid with children chosen PI to filter features to those descended from the 3rd level portfolio selected in the 
+dropdown.  
 
 The grid of available features to be copied will be grouped by their parent portfolio items.
 
@@ -20,7 +21,6 @@ A copy of the selected feature(s) and all child stories and tasks will be copied
 
 If a feature or any of its children fail to copy, the app will attempt to "cleanup" the copied feature by deleting all artifacts 
 within that feature that were successfully copied during the transaction.
-
 
 ###App Configuration
 
@@ -34,6 +34,10 @@ are used as means to organize and browse the catalog.
 
 
 ## Development Notes
+
+The Capability / Feature / Sub-Feature fields  hold template IDs.  It’s just info, the app
+doesn’t care.  Each should be a string field.
+
 
 ### First Load
 

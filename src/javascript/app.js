@@ -71,6 +71,8 @@ Ext.define("feature-catalog", {
                 operator: "!=",
                 value: parentPortfolioItem
             }];
+            
+        this.logger.log('filters:', parentFilters);
         return parentFilters;
     },
     _buildTreeStore: function(){
@@ -81,8 +83,8 @@ Ext.define("feature-catalog", {
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
             enableHierarchy: true,
-            //autoLoad: true,
-            fetch: ['FormattedID','Name','Project','Parent','Parent'],
+            autoLoad: true,
+            fetch: ['FormattedID','Name','Project','Parent','Parent']
         }).then({
             success: this._createTreeGrid,
             scope: this

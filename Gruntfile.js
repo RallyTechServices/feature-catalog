@@ -198,6 +198,7 @@ module.exports = function(grunt) {
 
             var options = {
                 uri: uri,
+                rejectUnauthorized: false,  // needed for sandbox
                 form: payload,
                 qs: parameters,
                 jar: j
@@ -233,6 +234,7 @@ module.exports = function(grunt) {
             var options = {
                 uri: uri,
                 form: payload,
+                rejectUnauthorized: false,  // needed for logging into sandbox
                 qs: parameters,
                 jar: j
             };
@@ -276,21 +278,26 @@ module.exports = function(grunt) {
 
             var options = {
                 uri: uri,
+                rejectUnauthorized: false,  // needed for logging into sandbox
                 form: payload,
                 qs: parameters,
                 jar: j
             };
         
             request.post(options, function(error,response,body){
+                if ( error ) {
+                    grunt.fail.fatal(error);
+                    return;
+                }
                 //grunt.log.writeln('responseCode:', response.statusCode);
                 if ( response.statusCode != 200 ) {
-                    grunt.log.writeln('oops');
-                    //grunt.log.writeln('--', response.headers);
-                    //grunt.log.writeln('--', response.request.headers);
-                    //grunt.log.writeln('--', response.request.body);
+                    grunt.log.writeln('--', body);
+                    grunt.log.writeln('--', response.headers);
+                    grunt.log.writeln('--', response.request.headers);
+                    grunt.log.writeln('--', response.request.body);
+                    grunt.fail.fatal('Could not create page.  Error Code: ' + response.statusCode);
+                    return;
                 }
-                //grunt.log.writeln('response:', response);
-                //grunt.log.writeln('response body', body);
                 // looking for
                 // <input type="hidden" name="oid" value="52337144851"/>
                 var page_oid = body.replace(/(.|[\r\n])*name="oid"/,"").replace(/"\/\>(.|[\r\n])*/,"").replace(/.*"/,"");
@@ -305,33 +312,39 @@ module.exports = function(grunt) {
         
         var options = { 
             uri: uri,
-            method:'GET', 
+            method:'GET',
+            rejectUnauthorized: false,  // needed for sandbox
             auth: { 'user': config.auth.username, 'pass': config.auth.password, 'sendImmediately': true } 
         };
 
         grunt.log.writeln('Authenticating on ', config.auth.server, ' as ', config.auth.username);
         
         request.get(options, function(error,response,body){
-                if ( response.statusCode != 200 ) {
-                    grunt.log.writeln('oops: couldn not log in');
-                } else {
-                    var json = JSON.parse(body);
-                    var key = json.OperationResult.SecurityToken;
 
-                    var cookie = response.headers['set-cookie'];
+            if ( error ) {
+                grunt.fail.fatal(error);
+                return;
+            }
 
-                    for ( var i=0; i<cookie.length; i++ ) {
-                        j.setCookie(request.cookie(cookie[i]),config.auth.server);
-                    }
+            if ( response.statusCode != 200 ) {
+                grunt.fail.fatal('Could not log in');
+            } else {
+                var json = JSON.parse(body);
+                var key = json.OperationResult.SecurityToken;
+
+                var cookie = response.headers['set-cookie'];
+
+                for ( var i=0; i<cookie.length; i++ ) {
+                    j.setCookie(request.cookie(cookie[i]),config.auth.server);
+                }
                     
-                    if (!config.auth.pageOid && !config.auth.panelOid) {
-                        makePage(key);
-                    } else {
-                        installApp(config.auth.pageOid, config.auth.panelOid);
-                    }
+                if (!config.auth.pageOid && !config.auth.panelOid) {
+                    makePage(key);
+                } else {
+                    installApp(config.auth.pageOid, config.auth.panelOid);
                 }
             }
-        );
+        });
 
         
     });
