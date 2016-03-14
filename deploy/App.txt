@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Mar 13 2016 19:19:01 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Mar 13 2016 19:40:02 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Mar 13 2016 19:19:01 GMT-0700 (PDT)";
-        var CHECKSUM = 73973875750;
+        var APP_BUILD_DATE = "Sun Mar 13 2016 19:40:02 GMT-0700 (PDT)";
+        var CHECKSUM = 75418833261;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -1282,9 +1282,8 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
 Ext.override(Rally.ui.gridboard.GridBoard,{
 
     // change so that filters in store can be applied at the associated level
+    // NOTE:  does not deal with multiple types
     _applyGridFilters: function(grid, filterObj) {
-        // CHANGE: save filters into store to be applied at the associated level
-        // NOTE:  does not deal with multiple types
         var filter = {};
         var type = Ext.util.Format.lowercase(filterObj.types[0]);
         filter[type] = filterObj.filters;
@@ -1299,9 +1298,7 @@ Ext.override(Rally.ui.gridboard.GridBoard,{
             grid.store.filter(this._getConfiguredFilters(filterObj.filters || [], filterObj.types || []));
             return;
         }
-        
-        //console.log('--', parentTypes, filters_by_type_path, filters_by_type_path[parentTypes[0]]);
-        
+                
         grid.store.filter(this._getConfiguredFilters(filters_by_type_path[parentTypes[0]] || [], parentTypes || []));
 
     }
@@ -1311,10 +1308,6 @@ Ext.override(Rally.data.wsapi.TreeStore, {
     filtersByPath: {},
     
     _getChildNodeFilters: function(node) {
-        console.log('_getChildNodeFilters');
-        console.log('node:', node, node.self.typePath);
-        console.log('filters by path', this.filtersByPath);
-        
         var parentType = node.self.typePath,
             childTypes = this._getChildTypePaths([parentType]),
             parentFieldNames = this._getParentFieldNames(childTypes, parentType);
@@ -1328,7 +1321,6 @@ Ext.override(Rally.data.wsapi.TreeStore, {
                 };
             }));
             
-            console.log('-->', childTypes, this.filtersByPath);
             if ( childTypes.length ) {
                 var extraFilters = this.filtersByPath[childTypes[0]];
                 if ( extraFilters && extraFilters.length > 0 ) {
@@ -1344,6 +1336,28 @@ Ext.override(Rally.data.wsapi.TreeStore, {
         return [];
     }
 });
+
+Ext.override(Rally.ui.grid.TreeView,{
+    _expandHandler: function(node, children){
+        if (this.getTreeStore().getRootNode() !== node && children.length === 0){
+            this.refresh(); //treegrid freaks out when it tries to expand a node that has no children, so force a refresh
+            if (!this.getTreeStore().hasErrors()){
+                Rally.ui.notify.Notifier.showWarning({message:node.get('FormattedID') + ' may have children that do not meet the selected filter criteriak.'});
+            }
+        }
+    }
+});
+
+
+Ext.override(Rally.ui.grid.plugin.TreeGridChildPager, {
+    _storeHasMoreChildPages: function(parentRecord) {
+        var loadedCount = this._getLoadedCount(parentRecord);
+        var childPageSize = this.cmp.getStore().getChildPageSize(parentRecord);
+        return parentRecord.get('leafCount') > loadedCount && loadedCount >= childPageSize;
+    }
+});
+
+
 
 /**
  * Created by kcorkan on 1/6/16.

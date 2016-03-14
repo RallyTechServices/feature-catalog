@@ -358,15 +358,16 @@ module.exports = function(grunt) {
     
     // (uses all the files in src/javascript)
     grunt.registerTask('build', "Create the html for deployment",['template:prod','setChecksum']);
-    // 
-    grunt.registerTask('debug', "Create an html file that can run in its own tab", ['template:dev','template:devApiKey']);
-    //
-    grunt.registerTask('confluence', "Create an html file that can run in its own tab", ['template:confluence']);
+    //     //
+    grunt.registerTask('confluence', "Create an html file that can run on confluence", ['template:confluence']);
     //
     grunt.registerTask('ugly', "Create the ugly html for deployment",['uglify:ugly','template:ugly']);
     //
     grunt.registerTask('apikey', "Create an html file that can run on another server", ['template:apikey','template:confluence']);
 
+    grunt.registerTask('debug', "Create an html file that can run in its own tab", ['template:dev']);
+
+    
     grunt.registerTask('test-fast', "Run tests that don't need to connect to Rally", ['jasmine:fast']);
     grunt.registerTask('test-slow', "Run tests that need to connect to Rally", ['jasmine:slow']);
 
