@@ -87,6 +87,7 @@
             }
         },
         _setValueFromSettings: function () {
+            this._setDisplayValue();
             //var newSettingsValue = this.settingsParent.app.getSetting("portfolioItemPicker"),
             //    oldSettingsValue = this.settingsParent.app.getSetting("buttonchooser");
             //
@@ -155,6 +156,9 @@
         },
 
         _getPortfolioItemDisplay: function () {
+            if ( Ext.isEmpty(this.portfolioItem) || !Ext.isObject(this.portfolioItem) ) {
+                return '';
+            }
             return this.portfolioItem.FormattedID + ': ' + this.portfolioItem.Name;
         },
 
@@ -196,12 +200,23 @@
         },
 
         setValue: function (value) {
-            if (value && value !== "undefined") {
-                this.value = value;
+            console.log('set value', value);
+            
+            if ( Ext.isEmpty(value) ) {
+                value = this.settingsParent.app.getSetting("portfolioItemPicker");
             }
-            else {
-                this.value = this.settingsParent.app.getSetting("portfolioItemPicker");
+            
+            if ( /{/.test(value) ) {
+                value = Ext.JSON.decode(value);
             }
+            
+            if ( Ext.isObject(value) ) {
+                this.value = value._ref;
+                this.portfolioItem = value;
+                this._setDisplayValue();
+            }
+            
+            this.value = value;
         },
 
         getSubmitData: function () {
@@ -209,7 +224,11 @@
 
             if (this.portfolioItem) {
                 this.setValue(this.portfolioItem._ref);
-                returnObject.portfolioItemPicker = this.portfolioItem._ref;
+                returnObject.portfolioItemPicker = Ext.JSON.encode({
+                    '_ref': this.portfolioItem._ref,
+                    'FormattedID': this.portfolioItem.FormattedID,
+                    'Name': this.portfolioItem.Name
+                });
             }
             else {
                 returnObject.portfolioItemPicker = "";

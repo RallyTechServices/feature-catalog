@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sun Mar 13 2016 19:48:21 GMT-0700 (PDT) -->
+    <!--  Build Date: Sun Mar 13 2016 20:29:26 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sun Mar 13 2016 19:48:21 GMT-0700 (PDT)";
-        var CHECKSUM = 75707254995;
+        var APP_BUILD_DATE = "Sun Mar 13 2016 20:29:26 GMT-0700 (PDT)";
+        var CHECKSUM = 78382266572;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -194,6 +194,8 @@ Ext.define("feature-catalog", {
     ],
     
     launch: function() {
+        this.logger.log("Settings: ", this.getSettings());
+        
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
                 this.logger.log('success', portfolioItemTypes)
@@ -216,12 +218,33 @@ Ext.define("feature-catalog", {
     },
 
     getCatalogPortfolioItem: function(){
-        return this.getSetting('portfolioItemPicker') || null;
+        var value = this.getSetting('portfolioItemPicker');
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if (/}/.test(value) ) {
+            value = Ext.JSON.decode(value);
+        }
+        
+        return value;
+    },
+
+    getCatalogPortfolioItemRef: function(){
+        var value = this.getCatalogPortfolioItem();
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if ( Ext.isObject(value) ) {
+            return value._ref;
+        }
+        return value;
     },
 
     updateDisplay: function(){
         this.down('#display_box').removeAll();
-        if (this.getCatalogPortfolioItem()){
+        if (this.getCatalogPortfolioItemRef()){
             this._buildTreeStore();
         } else {
             this.down('#display_box').add({
@@ -234,7 +257,7 @@ Ext.define("feature-catalog", {
         return [this.portfolioItemTypes[1].typePath.toLowerCase(),this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
     },
     _getParentFilters: function(){
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
@@ -264,8 +287,6 @@ Ext.define("feature-catalog", {
         this.logger.log('_buildTreeStore', this._getTreeModels());
 
         var models= [this._getTreeModels()[0]];
-
-        console.log('--', models);
         
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
@@ -321,7 +342,7 @@ Ext.define("feature-catalog", {
     _getPlugins: function(){
         var plugins = [];
 
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
@@ -405,12 +426,15 @@ Ext.define("feature-catalog", {
                 labelWidth: labelWidth
             }];
         }
-         fields.push({
-                    xtype: 'chartportfolioitempicker',
-                    name: 'catalogPortfolioItem',
-                    fieldLabel: '',
-                    margin: '25 0 0 0'
-                });
+        
+        fields.push({
+            xtype: 'chartportfolioitempicker',
+            name: 'catalogPortfolioItem',
+            fieldLabel: '',
+            margin: '25 0 0 0',
+            portfolioItem: this.getCatalogPortfolioItem()
+            
+        });
 
         return fields;
     },
@@ -1622,6 +1646,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             }
         },
         _setValueFromSettings: function () {
+            this._setDisplayValue();
             //var newSettingsValue = this.settingsParent.app.getSetting("portfolioItemPicker"),
             //    oldSettingsValue = this.settingsParent.app.getSetting("buttonchooser");
             //
@@ -1690,6 +1715,9 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
         },
 
         _getPortfolioItemDisplay: function () {
+            if ( Ext.isEmpty(this.portfolioItem) || !Ext.isObject(this.portfolioItem) ) {
+                return '';
+            }
             return this.portfolioItem.FormattedID + ': ' + this.portfolioItem.Name;
         },
 
@@ -1731,12 +1759,23 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
         },
 
         setValue: function (value) {
-            if (value && value !== "undefined") {
-                this.value = value;
+            console.log('set value', value);
+            
+            if ( Ext.isEmpty(value) ) {
+                value = this.settingsParent.app.getSetting("portfolioItemPicker");
             }
-            else {
-                this.value = this.settingsParent.app.getSetting("portfolioItemPicker");
+            
+            if ( /{/.test(value) ) {
+                value = Ext.JSON.decode(value);
             }
+            
+            if ( Ext.isObject(value) ) {
+                this.value = value._ref;
+                this.portfolioItem = value;
+                this._setDisplayValue();
+            }
+            
+            this.value = value;
         },
 
         getSubmitData: function () {
@@ -1744,7 +1783,11 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
 
             if (this.portfolioItem) {
                 this.setValue(this.portfolioItem._ref);
-                returnObject.portfolioItemPicker = this.portfolioItem._ref;
+                returnObject.portfolioItemPicker = Ext.JSON.encode({
+                    '_ref': this.portfolioItem._ref,
+                    'FormattedID': this.portfolioItem.FormattedID,
+                    'Name': this.portfolioItem.Name
+                });
             }
             else {
                 returnObject.portfolioItemPicker = "";

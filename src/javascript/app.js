@@ -16,6 +16,8 @@ Ext.define("feature-catalog", {
     ],
     
     launch: function() {
+        this.logger.log("Settings: ", this.getSettings());
+        
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
                 this.logger.log('success', portfolioItemTypes)
@@ -38,12 +40,33 @@ Ext.define("feature-catalog", {
     },
 
     getCatalogPortfolioItem: function(){
-        return this.getSetting('portfolioItemPicker') || null;
+        var value = this.getSetting('portfolioItemPicker');
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if (/}/.test(value) ) {
+            value = Ext.JSON.decode(value);
+        }
+        
+        return value;
+    },
+
+    getCatalogPortfolioItemRef: function(){
+        var value = this.getCatalogPortfolioItem();
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if ( Ext.isObject(value) ) {
+            return value._ref;
+        }
+        return value;
     },
 
     updateDisplay: function(){
         this.down('#display_box').removeAll();
-        if (this.getCatalogPortfolioItem()){
+        if (this.getCatalogPortfolioItemRef()){
             this._buildTreeStore();
         } else {
             this.down('#display_box').add({
@@ -56,7 +79,7 @@ Ext.define("feature-catalog", {
         return [this.portfolioItemTypes[1].typePath.toLowerCase(),this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
     },
     _getParentFilters: function(){
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
@@ -86,8 +109,6 @@ Ext.define("feature-catalog", {
         this.logger.log('_buildTreeStore', this._getTreeModels());
 
         var models= [this._getTreeModels()[0]];
-
-        console.log('--', models);
         
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
@@ -143,7 +164,7 @@ Ext.define("feature-catalog", {
     _getPlugins: function(){
         var plugins = [];
 
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
@@ -227,12 +248,15 @@ Ext.define("feature-catalog", {
                 labelWidth: labelWidth
             }];
         }
-         fields.push({
-                    xtype: 'chartportfolioitempicker',
-                    name: 'catalogPortfolioItem',
-                    fieldLabel: '',
-                    margin: '25 0 0 0'
-                });
+        
+        fields.push({
+            xtype: 'chartportfolioitempicker',
+            name: 'catalogPortfolioItem',
+            fieldLabel: '',
+            margin: '25 0 0 0',
+            portfolioItem: this.getCatalogPortfolioItem()
+            
+        });
 
         return fields;
     },
