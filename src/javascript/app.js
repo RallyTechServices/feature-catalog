@@ -189,7 +189,9 @@ Ext.define("feature-catalog", {
             ptype: 'rallygridboardcustomfiltercontrol',
             headerPosition: 'left',
             filterControlConfig: {
-                modelNames: [lowest_level_pi_type_name]
+                modelNames: [lowest_level_pi_type_name],
+                stateful: true,
+                stateId: this.getContext().getScopedStateId('pfv-grid-filter')
             }
         });
         return plugins;

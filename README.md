@@ -14,13 +14,18 @@ dropdown.
 The grid of available features to be copied will be grouped by their parent portfolio items.
 
 This app provides a way to select and copy those items in bulk to a new parent.  
-
 To copy features to a parent, select the feature(s) to copy, right click on the gear and select Copy to Parent....
 
 A copy of the selected feature(s) and all child stories and tasks will be copied to the selected parent.  
 
 If a feature or any of its children fail to copy, the app will attempt to "cleanup" the copied feature by deleting all artifacts 
 within that feature that were successfully copied during the transaction.
+
+While the drop-down applies to the top-level items to appear in the tree grid,
+the filter button applies to the next level down only.  Note that a top level
+node will still appear even if all its children have been filtered out.  Also,
+there will be no notification if a node has at least one child meeting the 
+filter but others are hidden.
 
 ###App Configuration
 
@@ -35,9 +40,11 @@ are used as means to organize and browse the catalog.
 
 ## Development Notes
 
-The Capability / Feature / Sub-Feature fields  hold template IDs.  It’s just info, the app
-doesn’t care.  Each should be a string field.
+The Capability / Feature / Sub-Feature fields  hold template IDs.  It’s just 
+info, the app doesn’t care.  Each should be a string field.
 
+Significant overrides in the filter-overrides.js file in order to allow an 
+app to pass filters into the store by type path.  
 
 ### First Load
 
