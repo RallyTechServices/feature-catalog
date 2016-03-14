@@ -41,8 +41,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             storeConfig: {
                 context: {
                     project: null,
-                    workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace()),
-
+                    workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace())
                 },
                 fetch: ['FormattedID','Name','Project'],
                 filters: this.parentFilters
