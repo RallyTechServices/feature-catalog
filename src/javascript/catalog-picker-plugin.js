@@ -11,7 +11,6 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
 
         stateful: true,
 
-        margin: '3 9 0 0',
         showInGridMode: true,
         headerPosition: 'left',
 
@@ -34,7 +33,7 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                 storeConfig: this.storeConfig || {},
                 displayField: 'Name',
                 valueField: 'ObjectID',
-                margin: 5,
+                margin: '3 25 0 0',
                 listeners: {
                     scope: this,
                     change: me._applyFilter

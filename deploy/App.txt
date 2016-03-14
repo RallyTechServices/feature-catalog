@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Sat Mar 12 2016 10:30:30 GMT-0800 (PST) -->
+    <!--  Build Date: Sun Mar 13 2016 19:19:01 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Sat Mar 12 2016 10:30:30 GMT-0800 (PST)";
-        var CHECKSUM = 66105963886;
+        var APP_BUILD_DATE = "Sun Mar 13 2016 19:19:01 GMT-0700 (PDT)";
+        var CHECKSUM = 73973875750;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -190,7 +190,6 @@ Ext.define("feature-catalog", {
     },
 
     items: [
-        {xtype:'container',itemId:'selector_box', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
@@ -240,6 +239,8 @@ Ext.define("feature-catalog", {
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
 
+        // 
+        
         this.logger.log('_getParentFilters', parentType, types);
         var idx = _.indexOf(types, parentType);
 
@@ -249,8 +250,14 @@ Ext.define("feature-catalog", {
                 operator: "!=",
                 value: parentPortfolioItem
             }];
-            
-        this.logger.log('filters:', parentFilters);
+        
+        var descendent_level_count = parentFiltersProperty.split('\.').length;
+        var root_index = idx - descendent_level_count;
+        if ( root_index < 0 ) { root_index = 0; }
+        
+        this.rootType = this.portfolioItemTypes[root_index];
+        
+        this.logger.log('parentFilters:', parentFilters);
         return parentFilters;
     },
     _buildTreeStore: function(){
@@ -258,10 +265,12 @@ Ext.define("feature-catalog", {
 
         var models= [this._getTreeModels()[0]];
 
+        console.log('--', models);
+        
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
             enableHierarchy: true,
-            autoLoad: true,
+            //autoLoad: true,
             fetch: ['FormattedID','Name','Project','Parent','Parent']
         }).then({
             success: this._createTreeGrid,
@@ -273,7 +282,7 @@ Ext.define("feature-catalog", {
         if (this.down('rallygridboard')){
             this.down('rallygridboard').destroy();
         }
-
+        
         var portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             parentFilters = this._getParentFilters();
 
@@ -281,6 +290,7 @@ Ext.define("feature-catalog", {
             xtype: 'rallygridboard',
             context: this.getContext(),
             modelNames: [this._getTreeModels()[0]],
+            parentTypes: [this._getTreeModels()[0]],
             toggleState: 'grid',
             gridConfig: {
                 store: store,
@@ -350,10 +360,20 @@ Ext.define("feature-catalog", {
             stateful: true,
             stateId: this.getContext().getScopedStateId('catalog-columns')
         });
+        
+        var lowest_level_pi_type_name = this.portfolioItemTypes[0].typePath;
+        
+        plugins.push({
+            ptype: 'rallygridboardcustomfiltercontrol',
+            headerPosition: 'left',
+            filterControlConfig: {
+                modelNames: [lowest_level_pi_type_name]
+            }
+        });
         return plugins;
     },
+    
     getSettingsFields: function(){
-
         var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
             fields = [],
             width = 500,
@@ -451,6 +471,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
     },
     load: function(rootArtifact, rootParent){
+        this.logger.log('load:', rootArtifact, rootParent);
+        
         this.totalRecords = 1;
         this.tree = {};
         this.stoppedByError = false;
@@ -1131,7 +1153,6 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
 
         stateful: true,
 
-        margin: '3 9 0 0',
         showInGridMode: true,
         headerPosition: 'left',
 
@@ -1154,7 +1175,7 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                 storeConfig: this.storeConfig || {},
                 displayField: 'Name',
                 valueField: 'ObjectID',
-                margin: 5,
+                margin: '3 25 0 0',
                 listeners: {
                     scope: this,
                     change: me._applyFilter
@@ -1258,6 +1279,92 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
         }
     });
 })();
+Ext.override(Rally.ui.gridboard.GridBoard,{
+
+    // change so that filters in store can be applied at the associated level
+    _applyGridFilters: function(grid, filterObj) {
+        // CHANGE: save filters into store to be applied at the associated level
+        // NOTE:  does not deal with multiple types
+        var filter = {};
+        var type = Ext.util.Format.lowercase(filterObj.types[0]);
+        filter[type] = filterObj.filters;
+        
+        var filters_by_type_path = Ext.Object.merge(grid.store.filtersByPath, filter);
+        grid.store.filtersByPath = filters_by_type_path;
+        
+        var parentTypes = grid.store.parentTypes;
+        grid.store.clearFilter(true);
+        
+        if ( Ext.Array.contains(parentTypes, type) ) {
+            grid.store.filter(this._getConfiguredFilters(filterObj.filters || [], filterObj.types || []));
+            return;
+        }
+        
+        //console.log('--', parentTypes, filters_by_type_path, filters_by_type_path[parentTypes[0]]);
+        
+        grid.store.filter(this._getConfiguredFilters(filters_by_type_path[parentTypes[0]] || [], parentTypes || []));
+
+    }
+});
+
+Ext.override(Rally.data.wsapi.TreeStore, {
+    filtersByPath: {},
+    
+    _getChildNodeFilters: function(node) {
+        console.log('_getChildNodeFilters');
+        console.log('node:', node, node.self.typePath);
+        console.log('filters by path', this.filtersByPath);
+        
+        var parentType = node.self.typePath,
+            childTypes = this._getChildTypePaths([parentType]),
+            parentFieldNames = this._getParentFieldNames(childTypes, parentType);
+
+        if (parentFieldNames.length) {
+            var filters = Rally.data.wsapi.Filter.or(_.map(parentFieldNames, function(parentFieldName) {
+                return {
+                    property: parentFieldName,
+                    operator: '=',
+                    value: node.get('_ref')
+                };
+            }));
+            
+            console.log('-->', childTypes, this.filtersByPath);
+            if ( childTypes.length ) {
+                var extraFilters = this.filtersByPath[childTypes[0]];
+                if ( extraFilters && extraFilters.length > 0 ) {
+                    filters = filters.and(
+                        Rally.data.wsapi.Filter.and(extraFilters)
+                    );
+                }
+            }
+            
+            return [filters];
+        }
+
+        return [];
+    }
+});
+
+/**
+ * Created by kcorkan on 1/6/16.
+ */
+Ext.override(Ext.grid.feature.Grouping, {
+
+    onReconfigure: function(grid, store, columns, oldStore, oldColumns) {
+        var me = grid;
+        if (store && store !== oldStore) {
+            // Grouping involves injecting a dataSource in early
+            if (oldStore && store.buffered !== oldStore.buffered) {
+                Ext.Error.raise('Cannot reconfigure grouping switching between buffered and non-buffered stores');
+            }
+            if (store.buffered) {
+                me.bindStore(store);
+                me.dataSource.processStore(store);
+            }
+        }
+    }
+
+});
 Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     alias: 'widget.rallyrecordmenuitembulkdeepcopy',
     extend: 'Rally.ui.menu.bulk.MenuItem',
@@ -1301,8 +1408,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             storeConfig: {
                 context: {
                     project: null,
-                    workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace()),
-
+                    workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace())
                 },
                 fetch: ['FormattedID','Name','Project'],
                 filters: this.parentFilters
@@ -1410,26 +1516,6 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
 
         Ext.callback(this.onActionComplete, null, [successfulRecords, unsuccessfulRecords]);
     }
-});
-/**
- * Created by kcorkan on 1/6/16.
- */
-Ext.override(Ext.grid.feature.Grouping, {
-
-    onReconfigure: function(grid, store, columns, oldStore, oldColumns) {
-        var me = grid;
-        if (store && store !== oldStore) {
-            // Grouping involves injecting a dataSource in early
-            if (oldStore && store.buffered !== oldStore.buffered) {
-                Ext.Error.raise('Cannot reconfigure grouping switching between buffered and non-buffered stores');
-            }
-            if (store.buffered) {
-                me.bindStore(store);
-                me.dataSource.processStore(store);
-            }
-        }
-    }
-
 });
 (function () {
     var Ext = window.Ext4 || window.Ext;

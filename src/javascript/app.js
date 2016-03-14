@@ -12,7 +12,6 @@ Ext.define("feature-catalog", {
     },
 
     items: [
-        {xtype:'container',itemId:'selector_box', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
@@ -62,6 +61,8 @@ Ext.define("feature-catalog", {
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
 
+        // 
+        
         this.logger.log('_getParentFilters', parentType, types);
         var idx = _.indexOf(types, parentType);
 
@@ -71,8 +72,14 @@ Ext.define("feature-catalog", {
                 operator: "!=",
                 value: parentPortfolioItem
             }];
-            
-        this.logger.log('filters:', parentFilters);
+        
+        var descendent_level_count = parentFiltersProperty.split('\.').length;
+        var root_index = idx - descendent_level_count;
+        if ( root_index < 0 ) { root_index = 0; }
+        
+        this.rootType = this.portfolioItemTypes[root_index];
+        
+        this.logger.log('parentFilters:', parentFilters);
         return parentFilters;
     },
     _buildTreeStore: function(){
@@ -80,10 +87,12 @@ Ext.define("feature-catalog", {
 
         var models= [this._getTreeModels()[0]];
 
+        console.log('--', models);
+        
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
             enableHierarchy: true,
-            autoLoad: true,
+            //autoLoad: true,
             fetch: ['FormattedID','Name','Project','Parent','Parent']
         }).then({
             success: this._createTreeGrid,
@@ -95,7 +104,7 @@ Ext.define("feature-catalog", {
         if (this.down('rallygridboard')){
             this.down('rallygridboard').destroy();
         }
-
+        
         var portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             parentFilters = this._getParentFilters();
 
@@ -103,6 +112,7 @@ Ext.define("feature-catalog", {
             xtype: 'rallygridboard',
             context: this.getContext(),
             modelNames: [this._getTreeModels()[0]],
+            parentTypes: [this._getTreeModels()[0]],
             toggleState: 'grid',
             gridConfig: {
                 store: store,
@@ -172,10 +182,20 @@ Ext.define("feature-catalog", {
             stateful: true,
             stateId: this.getContext().getScopedStateId('catalog-columns')
         });
+        
+        var lowest_level_pi_type_name = this.portfolioItemTypes[0].typePath;
+        
+        plugins.push({
+            ptype: 'rallygridboardcustomfiltercontrol',
+            headerPosition: 'left',
+            filterControlConfig: {
+                modelNames: [lowest_level_pi_type_name]
+            }
+        });
         return plugins;
     },
+    
     getSettingsFields: function(){
-
         var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
             fields = [],
             width = 500,
