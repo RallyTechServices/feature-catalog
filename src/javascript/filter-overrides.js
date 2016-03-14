@@ -55,3 +55,15 @@ Ext.override(Rally.data.wsapi.TreeStore, {
         return [];
     }
 });
+
+Ext.override(Rally.ui.grid.TreeView,{
+    _expandHandler: function(node, children){
+        if (this.getTreeStore().getRootNode() !== node && children.length === 0){
+            this.refresh(); //treegrid freaks out when it tries to expand a node that has no children, so force a refresh
+            if (!this.getTreeStore().hasErrors()){
+                Rally.ui.notify.Notifier.showWarning({message:node.get('FormattedID') + ' may have children that do not meet the selected filter criteria.'});
+            }
+        }
+    }
+});
+
