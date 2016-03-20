@@ -20,7 +20,7 @@ Ext.define('Rally.technicalservices.CatalogCombobox',{
         matchFieldWidth: true,
         queryMode: 'local',
         showArrows: true,
-        labelAlign: 'right',
+        labelAlign: 'right'
 
     },
 
