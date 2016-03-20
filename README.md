@@ -46,6 +46,9 @@ info, the app doesn’t care.  Each should be a string field.
 Significant overrides in the filter-overrides.js file in order to allow an 
 app to pass filters into the store by type path.  
 
+The filter plugin and the theme plugin can cause interesting race conditions, so
+there's some interaction horizontally that would be nice to have vertically instead.
+
 ### First Load
 
 If you've just downloaded this from github and you want to do development, 

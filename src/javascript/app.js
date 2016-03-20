@@ -15,12 +15,10 @@ Ext.define("feature-catalog", {
         {xtype:'container',itemId:'display_box'}
     ],
     
-    launch: function() {
-        this.logger.log("Settings: ", this.getSettings());
-        
+    launch: function() {        
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
-                this.logger.log('success', portfolioItemTypes)
+
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[0].typePath,
@@ -113,7 +111,6 @@ Ext.define("feature-catalog", {
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
             enableHierarchy: true,
-            //autoLoad: true,
             fetch: ['FormattedID','Name','Project','Parent','Parent']
         }).then({
             success: this._createTreeGrid,
@@ -211,8 +208,8 @@ Ext.define("feature-catalog", {
             headerPosition: 'left',
             filterControlConfig: {
                 modelNames: [lowest_level_pi_type_name],
-                stateful: true,
-                stateId: this.getContext().getScopedStateId('pfv-grid-filter')
+                stateful: false,
+                stateId: this.getContext().getScopedStateId('catalog-grid-filter')
             }
         });
         return plugins;
