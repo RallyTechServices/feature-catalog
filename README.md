@@ -11,7 +11,9 @@ If the ancestor portfolio item is more than 2 levels above the lowest level port
 above the grid with children chosen PI to filter features to those descended from the 3rd level portfolio selected in the 
 dropdown.  
 
-The grid of available features to be copied will be grouped by their parent portfolio items.
+The filter widget provides a way to filter on the items below the highest level displayed.  In this example, the filter applies to Initiatives:
+
+![ScreenShot](/images/feature-catalog-flare.png)  
 
 This app provides a way to select and copy those items in bulk to a new parent.  
 To copy features to a parent, select the feature(s) to copy, right click on the gear and select Copy to Parent....
