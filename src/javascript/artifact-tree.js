@@ -389,7 +389,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
             //if field is collection and count === 0, then it can be null, otherwise, we need to copy the cooleciton
             if (f.attributeDefinition.AttributeType !== "COLLECTION"){
-                var val = artifactToCopy.get(f.name) || null;
+                var val = artifactToCopy.get(f.name); // || null;
 
                 if (val && Ext.isObject(val)){  //If this is a reference field, then we need to use the ObjectId
                     val = val._ref;

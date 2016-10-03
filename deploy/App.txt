@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Feb 29 2016 17:40:41 GMT-0700 (MST) -->
+    <!--  Build Date: Mon Oct 03 2016 10:01:20 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Feb 29 2016 17:40:41 GMT-0700 (MST)";
-        var CHECKSUM = 65966801342;
+        var APP_BUILD_DATE = "Mon Oct 03 2016 10:01:20 GMT-0600 (MDT)";
+        var CHECKSUM = 66014498997;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -808,7 +808,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
             //if field is collection and count === 0, then it can be null, otherwise, we need to copy the cooleciton
             if (f.attributeDefinition.AttributeType !== "COLLECTION"){
-                var val = artifactToCopy.get(f.name) || null;
+                var val = artifactToCopy.get(f.name); // || null;
 
                 if (val && Ext.isObject(val)){  //If this is a reference field, then we need to use the ObjectId
                     val = val._ref;
@@ -1398,11 +1398,12 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             });
         } else {
             if (successfulRecords.length === 0){
-                message = "0 items have been copied"
+               message = "0 items have been copied";
             }
 
-            Rally.ui.notify.Notifier.showWarning({
-                message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage
+            Rally.ui.notify.Notifier.showError({
+                message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage,
+                saveDelay: 500
             });
         }
 
