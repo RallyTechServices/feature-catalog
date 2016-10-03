@@ -11,7 +11,6 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
 
         stateful: true,
 
-        margin: '3 9 0 0',
         showInGridMode: true,
         headerPosition: 'left',
 
@@ -24,6 +23,7 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
 
             this.showControl();
         },
+        
         getControlCmpConfig: function() {
             var me = this;
             return {
@@ -34,17 +34,24 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                 storeConfig: this.storeConfig || {},
                 displayField: 'Name',
                 valueField: 'ObjectID',
-                margin: 5,
+                margin: '3 25 0 0',
                 listeners: {
                     scope: this,
                     change: me._applyFilter
                 }
             };
         },
+        
         _applyFilter: function(cb) {
-
-            var parent = cb.getRecord() && cb.getRecord().get('_ref');
+            var record = this.record;
+            if ( !Ext.isEmpty(cb) ) {
+                var record = cb.getRecord();
+                this.record = record;
+            } 
+            var parent = record && record.get('_ref');
             if (parent){
+                console.log('parent:', parent);
+                
                 var filters = [{
                     property: 'Parent',
                     value: parent
@@ -53,7 +60,10 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                     types: this.types,
                     filters: filters
                 };
+                this.cmp.defineFilter(filterArgs);
+                
                 this.cmp.applyCustomFilter(filterArgs);
+                
             }
         }
     });

@@ -12,14 +12,13 @@ Ext.define("feature-catalog", {
     },
 
     items: [
-        {xtype:'container',itemId:'selector_box', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
-    launch: function() {
+    launch: function() {        
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
-                this.logger.log('success', portfolioItemTypes)
+
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[0].typePath,
@@ -39,12 +38,33 @@ Ext.define("feature-catalog", {
     },
 
     getCatalogPortfolioItem: function(){
-        return this.getSetting('portfolioItemPicker') || null;
+        var value = this.getSetting('portfolioItemPicker');
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if (/}/.test(value) ) {
+            value = Ext.JSON.decode(value);
+        }
+        
+        return value;
+    },
+
+    getCatalogPortfolioItemRef: function(){
+        var value = this.getCatalogPortfolioItem();
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if ( Ext.isObject(value) ) {
+            return value._ref;
+        }
+        return value;
     },
 
     updateDisplay: function(){
         this.down('#display_box').removeAll();
-        if (this.getCatalogPortfolioItem()){
+        if (this.getCatalogPortfolioItemRef()){
             this._buildTreeStore();
         } else {
             this.down('#display_box').add({
@@ -57,11 +77,13 @@ Ext.define("feature-catalog", {
         return [this.portfolioItemTypes[1].typePath.toLowerCase(),this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
     },
     _getParentFilters: function(){
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
 
+        // 
+        
         this.logger.log('_getParentFilters', parentType, types);
         var idx = _.indexOf(types, parentType);
 
@@ -71,18 +93,25 @@ Ext.define("feature-catalog", {
                 operator: "!=",
                 value: parentPortfolioItem
             }];
+        
+        var descendent_level_count = parentFiltersProperty.split('\.').length;
+        var root_index = idx - descendent_level_count;
+        if ( root_index < 0 ) { root_index = 0; }
+        
+        this.rootType = this.portfolioItemTypes[root_index];
+        
+        this.logger.log('parentFilters:', parentFilters);
         return parentFilters;
     },
     _buildTreeStore: function(){
         this.logger.log('_buildTreeStore', this._getTreeModels());
 
         var models= [this._getTreeModels()[0]];
-
+        
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
             enableHierarchy: true,
-            //autoLoad: true,
-            fetch: ['FormattedID','Name','Project','Parent','Parent'],
+            fetch: ['FormattedID','Name','Project','Parent','Parent']
         }).then({
             success: this._createTreeGrid,
             scope: this
@@ -93,7 +122,7 @@ Ext.define("feature-catalog", {
         if (this.down('rallygridboard')){
             this.down('rallygridboard').destroy();
         }
-
+        
         var portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             parentFilters = this._getParentFilters();
 
@@ -101,6 +130,7 @@ Ext.define("feature-catalog", {
             xtype: 'rallygridboard',
             context: this.getContext(),
             modelNames: [this._getTreeModels()[0]],
+            parentTypes: [this._getTreeModels()[0]],
             toggleState: 'grid',
             gridConfig: {
                 store: store,
@@ -131,7 +161,7 @@ Ext.define("feature-catalog", {
     _getPlugins: function(){
         var plugins = [];
 
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
@@ -170,10 +200,22 @@ Ext.define("feature-catalog", {
             stateful: true,
             stateId: this.getContext().getScopedStateId('catalog-columns')
         });
+        
+        var lowest_level_pi_type_name = this.portfolioItemTypes[0].typePath;
+        
+        plugins.push({
+            ptype: 'rallygridboardcustomfiltercontrol',
+            headerPosition: 'left',
+            filterControlConfig: {
+                modelNames: [lowest_level_pi_type_name],
+                stateful: false,
+                stateId: this.getContext().getScopedStateId('catalog-grid-filter')
+            }
+        });
         return plugins;
     },
+    
     getSettingsFields: function(){
-
         var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
             fields = [],
             width = 500,
@@ -203,12 +245,15 @@ Ext.define("feature-catalog", {
                 labelWidth: labelWidth
             }];
         }
-         fields.push({
-                    xtype: 'chartportfolioitempicker',
-                    name: 'catalogPortfolioItem',
-                    fieldLabel: '',
-                    margin: '25 0 0 0'
-                });
+        
+        fields.push({
+            xtype: 'chartportfolioitempicker',
+            name: 'catalogPortfolioItem',
+            fieldLabel: '',
+            margin: '25 0 0 0',
+            portfolioItem: this.getCatalogPortfolioItem()
+            
+        });
 
         return fields;
     },

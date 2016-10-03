@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Oct 03 2016 10:04:33 GMT-0600 (MDT) -->
+    <!--  Build Date: Mon Oct 03 2016 10:07:17 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Oct 03 2016 10:04:33 GMT-0600 (MDT)";
-        var CHECKSUM = 66014501770;
+        var APP_BUILD_DATE = "Mon Oct 03 2016 10:07:17 GMT-0600 (MDT)";
+        var CHECKSUM = 84357401990;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -190,14 +190,13 @@ Ext.define("feature-catalog", {
     },
 
     items: [
-        {xtype:'container',itemId:'selector_box', layout: {type: 'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
-    launch: function() {
+    launch: function() {        
         Rally.technicalservices.Toolbox.fetchPortfolioItemTypes().then({
             success: function(portfolioItemTypes){
-                this.logger.log('success', portfolioItemTypes)
+
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[0].typePath,
@@ -217,12 +216,33 @@ Ext.define("feature-catalog", {
     },
 
     getCatalogPortfolioItem: function(){
-        return this.getSetting('portfolioItemPicker') || null;
+        var value = this.getSetting('portfolioItemPicker');
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if (/}/.test(value) ) {
+            value = Ext.JSON.decode(value);
+        }
+        
+        return value;
+    },
+
+    getCatalogPortfolioItemRef: function(){
+        var value = this.getCatalogPortfolioItem();
+        if ( Ext.isEmpty(value) ) {
+            return null;
+        }
+        
+        if ( Ext.isObject(value) ) {
+            return value._ref;
+        }
+        return value;
     },
 
     updateDisplay: function(){
         this.down('#display_box').removeAll();
-        if (this.getCatalogPortfolioItem()){
+        if (this.getCatalogPortfolioItemRef()){
             this._buildTreeStore();
         } else {
             this.down('#display_box').add({
@@ -235,11 +255,13 @@ Ext.define("feature-catalog", {
         return [this.portfolioItemTypes[1].typePath.toLowerCase(),this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
     },
     _getParentFilters: function(){
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
 
+        // 
+        
         this.logger.log('_getParentFilters', parentType, types);
         var idx = _.indexOf(types, parentType);
 
@@ -249,18 +271,25 @@ Ext.define("feature-catalog", {
                 operator: "!=",
                 value: parentPortfolioItem
             }];
+        
+        var descendent_level_count = parentFiltersProperty.split('\.').length;
+        var root_index = idx - descendent_level_count;
+        if ( root_index < 0 ) { root_index = 0; }
+        
+        this.rootType = this.portfolioItemTypes[root_index];
+        
+        this.logger.log('parentFilters:', parentFilters);
         return parentFilters;
     },
     _buildTreeStore: function(){
         this.logger.log('_buildTreeStore', this._getTreeModels());
 
         var models= [this._getTreeModels()[0]];
-
+        
         Ext.create('Rally.data.wsapi.TreeStoreBuilder').build({
             models: models,
             enableHierarchy: true,
-            //autoLoad: true,
-            fetch: ['FormattedID','Name','Project','Parent','Parent'],
+            fetch: ['FormattedID','Name','Project','Parent','Parent']
         }).then({
             success: this._createTreeGrid,
             scope: this
@@ -271,7 +300,7 @@ Ext.define("feature-catalog", {
         if (this.down('rallygridboard')){
             this.down('rallygridboard').destroy();
         }
-
+        
         var portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase(),
             parentFilters = this._getParentFilters();
 
@@ -279,6 +308,7 @@ Ext.define("feature-catalog", {
             xtype: 'rallygridboard',
             context: this.getContext(),
             modelNames: [this._getTreeModels()[0]],
+            parentTypes: [this._getTreeModels()[0]],
             toggleState: 'grid',
             gridConfig: {
                 store: store,
@@ -309,7 +339,7 @@ Ext.define("feature-catalog", {
     _getPlugins: function(){
         var plugins = [];
 
-        var parentPortfolioItem = this.getCatalogPortfolioItem(),
+        var parentPortfolioItem = this.getCatalogPortfolioItemRef(),
             regex = new RegExp("^/(portfolioitem/.+)/","i"),
             parentType = parentPortfolioItem.match(regex)[1],
             types = _.map(this.portfolioItemTypes, function(p){return p.typePath.toLowerCase(); });
@@ -348,10 +378,22 @@ Ext.define("feature-catalog", {
             stateful: true,
             stateId: this.getContext().getScopedStateId('catalog-columns')
         });
+        
+        var lowest_level_pi_type_name = this.portfolioItemTypes[0].typePath;
+        
+        plugins.push({
+            ptype: 'rallygridboardcustomfiltercontrol',
+            headerPosition: 'left',
+            filterControlConfig: {
+                modelNames: [lowest_level_pi_type_name],
+                stateful: false,
+                stateId: this.getContext().getScopedStateId('catalog-grid-filter')
+            }
+        });
         return plugins;
     },
+    
     getSettingsFields: function(){
-
         var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
             fields = [],
             width = 500,
@@ -381,12 +423,15 @@ Ext.define("feature-catalog", {
                 labelWidth: labelWidth
             }];
         }
-         fields.push({
-                    xtype: 'chartportfolioitempicker',
-                    name: 'catalogPortfolioItem',
-                    fieldLabel: '',
-                    margin: '25 0 0 0'
-                });
+        
+        fields.push({
+            xtype: 'chartportfolioitempicker',
+            name: 'catalogPortfolioItem',
+            fieldLabel: '',
+            margin: '25 0 0 0',
+            portfolioItem: this.getCatalogPortfolioItem()
+            
+        });
 
         return fields;
     },
@@ -449,6 +494,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
     },
     load: function(rootArtifact, rootParent){
+        this.logger.log('load:', rootArtifact, rootParent);
+        
         this.totalRecords = 1;
         this.tree = {};
         this.stoppedByError = false;
@@ -1083,7 +1130,7 @@ Ext.define('Rally.technicalservices.CatalogCombobox',{
         matchFieldWidth: true,
         queryMode: 'local',
         showArrows: true,
-        labelAlign: 'right',
+        labelAlign: 'right'
 
     },
 
@@ -1129,7 +1176,6 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
 
         stateful: true,
 
-        margin: '3 9 0 0',
         showInGridMode: true,
         headerPosition: 'left',
 
@@ -1142,6 +1188,7 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
 
             this.showControl();
         },
+        
         getControlCmpConfig: function() {
             var me = this;
             return {
@@ -1152,17 +1199,24 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                 storeConfig: this.storeConfig || {},
                 displayField: 'Name',
                 valueField: 'ObjectID',
-                margin: 5,
+                margin: '3 25 0 0',
                 listeners: {
                     scope: this,
                     change: me._applyFilter
                 }
             };
         },
+        
         _applyFilter: function(cb) {
-
-            var parent = cb.getRecord() && cb.getRecord().get('_ref');
+            var record = this.record;
+            if ( !Ext.isEmpty(cb) ) {
+                var record = cb.getRecord();
+                this.record = record;
+            } 
+            var parent = record && record.get('_ref');
             if (parent){
+                console.log('parent:', parent);
+                
                 var filters = [{
                     property: 'Parent',
                     value: parent
@@ -1171,7 +1225,10 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                     types: this.types,
                     filters: filters
                 };
+                this.cmp.defineFilter(filterArgs);
+                
                 this.cmp.applyCustomFilter(filterArgs);
+                
             }
         }
     });
@@ -1256,6 +1313,156 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
         }
     });
 })();
+Ext.override(Rally.ui.gridboard.GridBoard,{
+
+    // allow for a component to define a filter without applying it
+    // used by the catalog picker because of race conditions
+    defineFilter: function(filterObj) {
+        console.log('defineFilter', filterObj);
+        
+        var gridOrBoard = this.getGridOrBoard();
+
+        if (gridOrBoard) {
+            console.log('..found board');
+            var store = gridOrBoard.getStore();
+
+            var filter = {};
+            var type = Ext.util.Format.lowercase(filterObj.types[0]);
+            filter[type] = filterObj.filters;
+            
+            var filters_by_type_path = Ext.Object.merge(store.filtersByPath, filter);
+            console.log('..setting filtersbypath', filters_by_type_path);
+            store.filtersByPath = filters_by_type_path;
+        }
+    },
+    
+    // change so that filters in store can be applied at the associated level
+    // NOTE:  does not deal with multiple types
+    _applyGridFilters: function(grid, filterObj) {
+        var filter = {};
+        var type = Ext.util.Format.lowercase(filterObj.types[0]);
+        filter[type] = filterObj.filters;
+        
+        var filters_by_type_path = Ext.Object.merge(grid.store.filtersByPath, filter);
+        grid.store.filtersByPath = filters_by_type_path;
+        
+        var parentTypes = grid.store.parentTypes;
+
+        grid.store.clearFilter(true);
+        
+        if ( Ext.Array.contains(parentTypes, type) ) {
+
+            grid.store.filter(this._getConfiguredFilters(filterObj.filters || [], filterObj.types || []));
+            return;
+        }
+        
+        grid.store.filter(this._getConfiguredFilters(filters_by_type_path[parentTypes[0]] || [], parentTypes || []));
+    }
+});
+
+Ext.override(Rally.data.wsapi.TreeStore, {
+    filtersByPath: {},
+    
+    _getChildNodeFilters: function(node) {
+        var parentType = node.self.typePath,
+            childTypes = this._getChildTypePaths([parentType]),
+            parentFieldNames = this._getParentFieldNames(childTypes, parentType);
+
+        if (parentFieldNames.length) {
+            var filters = Rally.data.wsapi.Filter.or(_.map(parentFieldNames, function(parentFieldName) {
+                return {
+                    property: parentFieldName,
+                    operator: '=',
+                    value: node.get('_ref')
+                };
+            }));
+            
+            if ( childTypes.length ) {
+                var extraFilters = this.filtersByPath[childTypes[0]];
+                if ( extraFilters && extraFilters.length > 0 ) {
+                    filters = filters.and(
+                        Rally.data.wsapi.Filter.and(extraFilters)
+                    );
+                }
+            }
+            
+            return [filters];
+        }
+
+        return [];
+    }
+
+});
+
+Ext.override(Rally.ui.grid.TreeView,{
+    _expandHandler: function(node, children){
+        if (this.getTreeStore().getRootNode() !== node && children.length === 0){
+            this.refresh(); //treegrid freaks out when it tries to expand a node that has no children, so force a refresh
+            if (!this.getTreeStore().hasErrors()){
+                Rally.ui.notify.Notifier.showWarning({message:node.get('FormattedID') + ' may have children that do not meet the selected filter criteria.'});
+            }
+        }
+    }
+});
+
+
+Ext.override(Rally.ui.grid.plugin.TreeGridChildPager, {
+    _storeHasMoreChildPages: function(parentRecord) {
+        var loadedCount = this._getLoadedCount(parentRecord);
+        var childPageSize = this.cmp.getStore().getChildPageSize(parentRecord);
+        return parentRecord.get('leafCount') > loadedCount && loadedCount >= childPageSize;
+    }
+});
+
+Ext.override(Rally.ui.gridboard.plugin.GridBoardCustomFilterControl,{
+    _applyFilter: function() {
+        
+        var filters = _.compact(Ext.Array.merge(this.filterButton.getFilters(), this.ownerFilter && this.ownerFilter.getFilter())),
+            modifiedFilters = Rally.data.wsapi.filter.FilterModificationator.modifyFilters(filters, this.filterChildren),
+            filterArgs = {
+                types: this.filterButton.getTypes(),
+                filters: modifiedFilters
+            };
+            
+            // interesting race condition when the catalog picker and the custom filter plugin are used
+            // the custom filter loads first because it has nothing to load, BUT its filter on
+            // the grid loads more slowly when it returns more items so its grid reload overwrites
+            // the grid reload of the dropdown from this plugin.  This would work better if the 
+            // load could be canceled properly.
+        
+            this.cmp.defineFilter(filterArgs);
+            
+            Ext.Array.each(this.cmp.plugins, function(p){
+                if ( p.ptype == "tscatalogpickerplugin" ) {
+                    p._applyFilter();
+                }
+            });
+                
+        //this.cmp.applyCustomFilter(filterArgs);
+    }
+
+});
+
+/**
+ * Created by kcorkan on 1/6/16.
+ */
+Ext.override(Ext.grid.feature.Grouping, {
+
+    onReconfigure: function(grid, store, columns, oldStore, oldColumns) {
+        var me = grid;
+        if (store && store !== oldStore) {
+            // Grouping involves injecting a dataSource in early
+            if (oldStore && store.buffered !== oldStore.buffered) {
+                Ext.Error.raise('Cannot reconfigure grouping switching between buffered and non-buffered stores');
+            }
+            if (store.buffered) {
+                me.bindStore(store);
+                me.dataSource.processStore(store);
+            }
+        }
+    }
+
+});
 Ext.define('Rally.ui.menu.bulk.DeepCopy', {
     alias: 'widget.rallyrecordmenuitembulkdeepcopy',
     extend: 'Rally.ui.menu.bulk.MenuItem',
@@ -1299,8 +1506,7 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             storeConfig: {
                 context: {
                     project: null,
-                    workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace()),
-
+                    workspace: Rally.util.Ref.getRelativeUri(this.getContext().getWorkspace())
                 },
                 fetch: ['FormattedID','Name','Project'],
                 filters: this.parentFilters
@@ -1410,26 +1616,6 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
         Ext.callback(this.onActionComplete, null, [successfulRecords, unsuccessfulRecords]);
     }
 });
-/**
- * Created by kcorkan on 1/6/16.
- */
-Ext.override(Ext.grid.feature.Grouping, {
-
-    onReconfigure: function(grid, store, columns, oldStore, oldColumns) {
-        var me = grid;
-        if (store && store !== oldStore) {
-            // Grouping involves injecting a dataSource in early
-            if (oldStore && store.buffered !== oldStore.buffered) {
-                Ext.Error.raise('Cannot reconfigure grouping switching between buffered and non-buffered stores');
-            }
-            if (store.buffered) {
-                me.bindStore(store);
-                me.dataSource.processStore(store);
-            }
-        }
-    }
-
-});
 (function () {
     var Ext = window.Ext4 || window.Ext;
 
@@ -1519,6 +1705,7 @@ Ext.override(Ext.grid.feature.Grouping, {
             }
         },
         _setValueFromSettings: function () {
+            this._setDisplayValue();
             //var newSettingsValue = this.settingsParent.app.getSetting("portfolioItemPicker"),
             //    oldSettingsValue = this.settingsParent.app.getSetting("buttonchooser");
             //
@@ -1587,6 +1774,9 @@ Ext.override(Ext.grid.feature.Grouping, {
         },
 
         _getPortfolioItemDisplay: function () {
+            if ( Ext.isEmpty(this.portfolioItem) || !Ext.isObject(this.portfolioItem) ) {
+                return '';
+            }
             return this.portfolioItem.FormattedID + ': ' + this.portfolioItem.Name;
         },
 
@@ -1628,12 +1818,23 @@ Ext.override(Ext.grid.feature.Grouping, {
         },
 
         setValue: function (value) {
-            if (value && value !== "undefined") {
-                this.value = value;
+            console.log('set value', value);
+            
+            if ( Ext.isEmpty(value) ) {
+                value = this.settingsParent.app.getSetting("portfolioItemPicker");
             }
-            else {
-                this.value = this.settingsParent.app.getSetting("portfolioItemPicker");
+            
+            if ( /{/.test(value) ) {
+                value = Ext.JSON.decode(value);
             }
+            
+            if ( Ext.isObject(value) ) {
+                this.value = value._ref;
+                this.portfolioItem = value;
+                this._setDisplayValue();
+            }
+            
+            this.value = value;
         },
 
         getSubmitData: function () {
@@ -1641,7 +1842,11 @@ Ext.override(Ext.grid.feature.Grouping, {
 
             if (this.portfolioItem) {
                 this.setValue(this.portfolioItem._ref);
-                returnObject.portfolioItemPicker = this.portfolioItem._ref;
+                returnObject.portfolioItemPicker = Ext.JSON.encode({
+                    '_ref': this.portfolioItem._ref,
+                    'FormattedID': this.portfolioItem.FormattedID,
+                    'Name': this.portfolioItem.Name
+                });
             }
             else {
                 returnObject.portfolioItemPicker = "";

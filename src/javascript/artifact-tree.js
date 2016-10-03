@@ -30,6 +30,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
     },
     load: function(rootArtifact, rootParent){
+        this.logger.log('load:', rootArtifact, rootParent);
+        
         this.totalRecords = 1;
         this.tree = {};
         this.stoppedByError = false;
