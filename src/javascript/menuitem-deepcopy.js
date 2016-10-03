@@ -139,11 +139,12 @@ Ext.define('Rally.ui.menu.bulk.DeepCopy', {
             });
         } else {
             if (successfulRecords.length === 0){
-                message = "0 items have been copied"
+               message = "0 items have been copied";
             }
 
-            Rally.ui.notify.Notifier.showWarning({
-                message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage
+            Rally.ui.notify.Notifier.showError({
+                message: message + ', but ' + unsuccessfulRecords.length + ' failed: ' + errorMessage,
+                saveDelay: 500
             });
         }
 
