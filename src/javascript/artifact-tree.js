@@ -62,7 +62,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.fireEvent('statusupdate', 0, this.totalArtifacts);
         var overrides = {PortfolioItem: "", Parent: ""};
         if (this.level1TemplateField){
-            overrides[this.level1TemplateField] = this.rootGrandparent;
+            overrides[this.level1TemplateField] = this.rootArtifact.get('FormattedID'); //this.rootGrandparent;
         }
         if (this.level2TemplateField){
             overrides[this.level2TemplateField] = this.rootParent;
@@ -406,6 +406,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                 }
             }
         }, this);
+        this.logger.log('getFieldsToCopy fieldHash', fieldHash)
 
         return fieldHash;
     },

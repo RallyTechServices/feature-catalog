@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Mon Oct 03 2016 10:07:17 GMT-0600 (MDT) -->
+    <!--  Build Date: Fri Oct 07 2016 11:34:00 GMT-0600 (MDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Mon Oct 03 2016 10:07:17 GMT-0600 (MDT)";
-        var CHECKSUM = 84357401990;
+        var APP_BUILD_DATE = "Fri Oct 07 2016 11:34:00 GMT-0600 (MDT)";
+        var CHECKSUM = 85883966813;
     </script>
     
     <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
@@ -326,9 +326,9 @@ Ext.define("feature-catalog", {
                         portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
                         typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task'],
                         parentFilters: parentFilters,
-                        level1TemplateField: this.getSetting('level1TemplateField') || null,
-                        level2TemplateField: this.getSetting('level2TemplateField') || null,
-                        level3TemplateField: this.getSetting('level3TemplateField') || null
+                        level1TemplateField: this.getSetting('level1TemplateField') || null
+                       // level2TemplateField: this.getSetting('level2TemplateField') || null,
+                        // level3TemplateField: this.getSetting('level3TemplateField') || null
                     }]
                 }
             },
@@ -401,25 +401,35 @@ Ext.define("feature-catalog", {
 
         if (model){
             fields = [{
-                xtype: 'rallyfieldcombobox',
-                name: 'level3TemplateField',
-                fieldLabel: 'FCID01 Capability Field',
-                model: model,
-                width: width,
-                labelWidth: labelWidth
-            }, {
-                xtype: 'rallyfieldcombobox',
-                name: 'level2TemplateField',
-                fieldLabel: 'FCID02 Feature Field',
-                model: model,
-                width: width,
-                labelWidth: labelWidth
-            }, {
+            //    xtype: 'rallyfieldcombobox',
+            //    name: 'level3TemplateField',
+            //    fieldLabel: 'FCID01 Capability Field',
+            //    model: model,
+            //    width: width,
+            //    labelWidth: labelWidth
+            //}, {
+            //    xtype: 'rallyfieldcombobox',
+            //    name: 'level2TemplateField',
+            //    fieldLabel: 'FCID02 Feature Field',
+            //    model: model,
+            //    width: width,
+            //    labelWidth: labelWidth
+            //}, {
                 xtype: 'rallyfieldcombobox',
                 name: 'level1TemplateField',
                 fieldLabel: 'FCID03 Sub-Feature Field',
                 model: model,
                 width: width,
+                _isNotHidden: function(field) {
+                    if (field.hidden || field.readOnly || field.constrained){
+                        return false;
+                    }
+                    if (field.attributeDefinition && ((field.attributeDefinition.AttributeType === 'STRING') ||
+                        (field.attributeDefinition.AttributeType === 'TEXT'))){
+                        return true;
+                    }
+                    return false;
+                },
                 labelWidth: labelWidth
             }];
         }
@@ -526,7 +536,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.fireEvent('statusupdate', 0, this.totalArtifacts);
         var overrides = {PortfolioItem: "", Parent: ""};
         if (this.level1TemplateField){
-            overrides[this.level1TemplateField] = this.rootGrandparent;
+            overrides[this.level1TemplateField] = this.rootArtifact.get('FormattedID'); //this.rootGrandparent;
         }
         if (this.level2TemplateField){
             overrides[this.level2TemplateField] = this.rootParent;
@@ -870,6 +880,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                 }
             }
         }, this);
+        this.logger.log('getFieldsToCopy fieldHash', fieldHash)
 
         return fieldHash;
     },

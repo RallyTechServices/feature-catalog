@@ -148,9 +148,9 @@ Ext.define("feature-catalog", {
                         portfolioItemTypes: _.map(this.portfolioItemTypes, function(p){ return p.typePath; }),
                         typesToCopy: [this.portfolioItemTypes[0].typePath, 'hierarchicalrequirement','task'],
                         parentFilters: parentFilters,
-                        level1TemplateField: this.getSetting('level1TemplateField') || null,
-                        level2TemplateField: this.getSetting('level2TemplateField') || null,
-                        level3TemplateField: this.getSetting('level3TemplateField') || null
+                        level1TemplateField: this.getSetting('level1TemplateField') || null
+                       // level2TemplateField: this.getSetting('level2TemplateField') || null,
+                        // level3TemplateField: this.getSetting('level3TemplateField') || null
                     }]
                 }
             },
@@ -223,25 +223,35 @@ Ext.define("feature-catalog", {
 
         if (model){
             fields = [{
-                xtype: 'rallyfieldcombobox',
-                name: 'level3TemplateField',
-                fieldLabel: 'FCID01 Capability Field',
-                model: model,
-                width: width,
-                labelWidth: labelWidth
-            }, {
-                xtype: 'rallyfieldcombobox',
-                name: 'level2TemplateField',
-                fieldLabel: 'FCID02 Feature Field',
-                model: model,
-                width: width,
-                labelWidth: labelWidth
-            }, {
+            //    xtype: 'rallyfieldcombobox',
+            //    name: 'level3TemplateField',
+            //    fieldLabel: 'FCID01 Capability Field',
+            //    model: model,
+            //    width: width,
+            //    labelWidth: labelWidth
+            //}, {
+            //    xtype: 'rallyfieldcombobox',
+            //    name: 'level2TemplateField',
+            //    fieldLabel: 'FCID02 Feature Field',
+            //    model: model,
+            //    width: width,
+            //    labelWidth: labelWidth
+            //}, {
                 xtype: 'rallyfieldcombobox',
                 name: 'level1TemplateField',
                 fieldLabel: 'FCID03 Sub-Feature Field',
                 model: model,
                 width: width,
+                _isNotHidden: function(field) {
+                    if (field.hidden || field.readOnly || field.constrained){
+                        return false;
+                    }
+                    if (field.attributeDefinition && ((field.attributeDefinition.AttributeType === 'STRING') ||
+                        (field.attributeDefinition.AttributeType === 'TEXT'))){
+                        return true;
+                    }
+                    return false;
+                },
                 labelWidth: labelWidth
             }];
         }
