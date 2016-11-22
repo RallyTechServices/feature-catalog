@@ -12,7 +12,6 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
     parentChildTypeMap: null,
     blacklistFields: null,
 
-
     stoppedByError: false,
 
     constructor: function(config){
@@ -54,7 +53,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         this.fireEvent('statusupdate', this.completedArtifacts, this.totalArtifacts);
     },
     deepCopy: function(parent){
-        this.logger.log('deepCopy');
+        this.logger.log('..deepCopy..');
         var me = this;
         this.totalArtifacts = _.keys(this.tree).length || 0;
         this.completedArtifacts = 0;
@@ -75,9 +74,10 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             success: function(){
                 this.logger.log('deepCopy. _copyStandaloneArtifacts success');
                 Deft.Chain.sequence([
-                    me._copyTasks,
-                    me._updateCollections,
-                    me._stitchArtifacts
+                    function() { return me._copyTasks(); },
+                    function() { return me._updateCollections(); },
+                    function() { return me._stitchArtifacts(); },
+                    function() { return me._copyAttachments(); }
                 ],me).then({
                     success: function(){
                         this.logger.log('set parent', parent.get('_ref'));
@@ -94,6 +94,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                         });
                     },
                     failure: function(msg){
+                        console.error(msg);
                         me._deleteArtifacts();
                         me.fireEvent('copyerror',msg);
                     },
@@ -232,13 +233,13 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         return newRefs;
     },
     _updateCollections: function(){
+        this.logger.log('_updateCollections start');
         var promises = [],
             deferred = Ext.create('Deft.Deferred'),
             collectionFields = ['Predecessors','Tags'];
 
         _.each(this.tree, function(obj, oid) {
             _.each(collectionFields, function (cf) {
-                console.log('_updateCollections', obj.record.get('_type'), cf, obj[cf]);
                 if (obj[cf] && obj[cf].length > 0) {
                     if (cf === 'Predecessors') {
                         promises.push(function () {
@@ -257,6 +258,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             }, this);
         });
 
+        this.logger.log('_updateCollections promises', promises.length);
+        
         Deft.Chain.sequence(promises, this).then({
             success: function(){
                 this.logger.log('_updateCollections success');
@@ -271,25 +274,31 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
         return deferred;
     },
+    
     _updateCollection: function(newArtifact, collectionName, collectionRefs){
-        this.logger.log('_updateCollection', newArtifact, collectionName, collectionRefs);
+        this.logger.log('_updateCollection', collectionName, newArtifact, collectionRefs);
 
-        var deferred = Ext.create('Deft.Deferred'),
+        var me = this,
+            deferred = Ext.create('Deft.Deferred'),
             store = newArtifact.getCollection(collectionName);
 
         store.load({
             callback: function(){
+                me.logger.log("_updateCollection after store load");
+                if ( collectionRefs.length === 0 ) { deferred.resolve(); }
+                
                 Ext.Array.each(collectionRefs, function(cr){
                     store.add(cr)
                 });
                 store.sync({
                     callback: function(){
+                        me.logger.log("_updateCollection after store sync");
                         deferred.resolve();
                     }
                 });
             }
         });
-        return deferred;
+        return deferred.promise;
     },
 
     _updateArtifact: function(rec){
@@ -317,7 +326,6 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                 //find parent
                 var parent = me._getTaskParentRef(oid);
                 if (parent){
-                    me.logger.log('parentRef', parent);
                     promises.push(function(){ return me.copyArtifact(oid, {WorkProduct: parent}); });
                 }
             }
@@ -325,6 +333,42 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
         Deft.Chain.sequence(promises, this).then({
             success: function(){
+                this.logger.log('_copyTasks success');
+                deferred.resolve();
+            },
+            failure: function(msg){
+                this.logger.log('_copyTasks fail', msg);
+                deferred.reject(msg);
+            },
+            scope: this
+        });
+        return deferred;
+    },
+    
+    _copyAttachments:function(source_artifact,target_artifact) {
+        this.logger.log('_copyAttachments');
+        var me = this,
+            promises = [],
+            deferred = Ext.create('Deft.Deferred');
+
+        _.each(this.tree, function(obj, oid){
+            var attachment_oids = obj.Attachments;
+            var parent_record = obj.copyRecord;
+                        
+            if ( !parent_record ) {
+                me.logger.log("_copyAttachments no copy record", obj);
+            } else {
+                Ext.Array.each(attachment_oids, function(attachment_oid){
+                    promises.push( function() {
+                        return me.copyAttachment(attachment_oid,parent_record);
+                    });
+                });
+            }
+        }, this);
+
+        Deft.Chain.sequence(promises, this).then({
+            success: function(){
+                me.logger.log('_copyAttachments resolve');
                 deferred.resolve();
             },
             failure: function(msg){
@@ -332,14 +376,15 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
             },
             scope: this
         });
-        return deferred;
+        return deferred;    
     },
+    
     _getTaskParentRef: function(taskOid){
         var parentOid = null;
 
         _.each(this.tree, function(obj, oid){
             var tasks = obj && obj.Tasks || [];
-            console.log(tasks, taskOid,Ext.Array.contains(tasks, Number(taskOid)));
+
             if (Ext.Array.contains(tasks, Number(taskOid))){
                 parentOid = obj.copyRecord && obj.copyRecord.get('ObjectID') || null;
                 return false;
@@ -361,6 +406,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                         this.logger.log('copyArtifact callback',artifact.get('FormattedID'), operation.wasSuccessful(), result, operation);
                         if (operation.wasSuccessful()){
                             this.tree[artifactOid].copyRecord = result;
+                            
                             this.completedArtifacts++;
                             this._updateStatus();
                             deferred.resolve();
@@ -380,12 +426,83 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         });
         return deferred;
     },
+    
+    copyAttachment: function(oid,parent_record) {
+        this.logger.log("copyAttachment", oid, parent_record);
+        
+        var deferred = Ext.create('Deft.Deferred'),
+            me = this;
+
+        Deft.Chain.sequence([
+            function() { return me._fetchModel('Attachment'); },
+            function() { return me._fetchModel('AttachmentContent'); }
+        ]).then({
+            success: function(models){
+                var attachment_model = models[0];
+                var attachment_content_model = models[1];
+                
+                attachment_model.load(oid, {
+                    fetch: ['ObjectID','Content','ContentType','Description','Name','Size','Summary'],
+                    callback: function(source_attachment, operation) {
+                        if(operation.wasSuccessful()) {
+                            var content_oid = source_attachment.get('Content').ObjectID;
+                            attachment_content_model.load(content_oid, {
+                                fetch: ['Content'],
+                                callback: function(source_attachment_content, operation) {
+                                    if(operation.wasSuccessful()) {
+                                        var content = source_attachment_content.get('Content');
+                                        
+                                        Ext.create(attachment_content_model, { 'Content': content }).save({
+                                            callback: function(content_record,operation) {
+                                                if (operation.wasSuccessful()) {
+                                                    Ext.create(attachment_model, {
+                                                        Artifact   : parent_record.get('_ref'),
+                                                        Content    : content_record.get('_ref'),
+                                                        ContentType: source_attachment.get('ContentType'),
+                                                        Name       : source_attachment.get('Name'),
+                                                        Description: source_attachment.get('Description'),
+                                                        Size       : source_attachment.get('Size'),
+                                                        Summary    : source_attachment.get('Summary')
+                                                    }).save({
+                                                        callback: function(attachment, operation){
+                                                            if (operation.wasSuccessful()){
+                                                                console.log('Saved attachment: ', source_attachment.get('Name'));
+                                                                deferred.resolve();
+                                                            } else {
+                                                                deferred.reject(operation.error.errors.join(','));
+                                                            }
+                                                        }
+                                                    });
+                                                } else {
+                                                    deferred.reject(operation.error.errors.join(','));
+                                                }
+                                            }
+                                        });                                        
+                                    } else {
+                                        deferred.reject(operation.error.errors.join(','));
+                                    }
+                                }
+                            });
+                        } else {
+                            deferred.reject(operation.error.errors.join(','));
+                        }
+                    }
+                });
+            },
+            failure: function(msg){
+                deferred.reject(msg);
+            },
+            scope: this
+        });
+        return deferred;
+    },
+    
     getFieldsToCopy: function(artifactToCopy, overrideFields){
         var fields = artifactToCopy.getFields(),
             copyableFields = _.filter(fields, this._fieldIsCopyable, this),
             fieldHash = {};
 
-        this.logger.log('getFieldsToCopy',copyableFields);
+        //this.logger.log('getFieldsToCopy',copyableFields);
 
         _.each(copyableFields, function(f){
 
@@ -400,13 +517,13 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                 if (_.has(overrideFields, f.name)){
                     val = overrideFields[f.name];
                 }
-                this.logger.log('field', f.name, f.attributeDefinition.AttributeType, val,artifactToCopy.get(f.name));
+                //this.logger.log('field', f.name, f.attributeDefinition.AttributeType, val,artifactToCopy.get(f.name));
                 if (val){
                     fieldHash[f.name] = val;
                 }
             }
         }, this);
-        this.logger.log('getFieldsToCopy fieldHash', fieldHash)
+        //this.logger.log('getFieldsToCopy fieldHash', fieldHash)
 
         return fieldHash;
     },
@@ -472,7 +589,7 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
         return {record: artifact, error: null, childCount: {}};
     },
     _loadArtifactCollections: function(artifact){
-        var collectionFields = ['Predecessors','Tags'],
+        var collectionFields = ['Predecessors','Tags','Attachments'],
             promises = [];
 
         _.each(collectionFields, function(cf){
