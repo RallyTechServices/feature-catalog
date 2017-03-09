@@ -26,6 +26,8 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
         
         getControlCmpConfig: function() {
             var me = this;
+            console.log('getControlCmpConfig storeConfig', this.storeConfig);
+            
             return {
                 xtype: 'rallycatalogcombobox',
                 fieldLabel: this.fieldLabel,
