@@ -55,9 +55,10 @@ Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {
                 console.log('parent:', parent);
                 
                 var filters = [{
-                    property: 'Parent',
-                    value: parent
-                }],
+                        property: this.types[0] == 'hierarchicalrequirement' ? 'Feature' : 'Parent',
+                        value: parent
+                    }];
+
                 filterArgs = {
                     types: this.types,
                     filters: filters
