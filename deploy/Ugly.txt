@@ -3,14 +3,14 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Mar 09 2017 09:22:30 GMT-0800 (PST) -->
+    <!--  Build Date: Thu Mar 16 2017 14:02:38 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Mar 09 2017 09:22:30 GMT-0800 (PST)";
+        var APP_BUILD_DATE = "Thu Mar 16 2017 14:02:38 GMT-0700 (PDT)";
         var CHECKSUM = [%= checksum %];
     </script>
     
-    <script type="text/javascript" src="/apps/2.0/sdk.js"></script>
+    <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
 
     <script type="text/javascript">
         Rally.onReady(function() {
