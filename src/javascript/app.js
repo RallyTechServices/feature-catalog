@@ -12,6 +12,7 @@ Ext.define("feature-catalog", {
     },
 
     items: [
+        {xtype:'container',itemId:'selector_box',layout:{type:'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
@@ -22,7 +23,6 @@ Ext.define("feature-catalog", {
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[1].typePath,
-                    //type: portfolioItemTypes[0].typePath,
                     success: function(model) {
                         this.portfolioItemModel = model;
                         this.updateDisplay();
@@ -75,7 +75,7 @@ Ext.define("feature-catalog", {
     },
     _getTreeModels: function(){
         if('UserStory' == this.getSetting('piLevelType')){
-            return ['hierarchicalrequirement'];
+            return [this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
         }else if('Feature' == this.getSetting('piLevelType')){
             return [this.portfolioItemTypes[1].typePath.toLowerCase(),this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
         }else{
@@ -95,7 +95,7 @@ Ext.define("feature-catalog", {
         var idxRange;
 
         if('UserStory' == this.getSetting('piLevelType')){
-            idxRange =  0;
+            idxRange =  idx;
         }else if('Feature' == this.getSetting('piLevelType')){
             idxRange = idx-1;
         }else{
@@ -103,21 +103,12 @@ Ext.define("feature-catalog", {
         }
 
         var parentFilters = [];
-        if('UserStory' == this.getSetting('piLevelType')){
-            idxRange =  idx-1;
-            parentFilters = [{
-                property: 'Feature',
-                operator: "!=",
-                value: parentPortfolioItem
-            }];            
-        }else {
             var parentFiltersProperty = _.range(idxRange).map(function(p){return "Parent";}).join(".");
             parentFilters = [{
                 property: parentFiltersProperty,
                 operator: "!=",
                 value: parentPortfolioItem
             }];
-        }
 
         this.logger.log('parentFilters:', parentFilters);
         return parentFilters;
@@ -145,7 +136,7 @@ Ext.define("feature-catalog", {
         var typesToCopy = [],
             portfolioItemParentModel;
         if('UserStory' == this.getSetting('piLevelType')){
-            portfolioItemParentModel = 'hierarchicalrequirement';
+            portfolioItemParentModel = this.portfolioItemTypes[0].typePath.toLowerCase();//'hierarchicalrequirement';
             typesToCopy = ['hierarchicalrequirement','task'];
         }else if('Feature' == this.getSetting('piLevelType')){
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase();
@@ -192,6 +183,7 @@ Ext.define("feature-catalog", {
             height: this.getHeight()
         });
     },
+
     _getPlugins: function(){
         var plugins = [];
 
@@ -206,14 +198,12 @@ Ext.define("feature-catalog", {
         var level;
 
         if('UserStory' == this.getSetting('piLevelType')){
-            level = 0;
+            level = 1;
         }else if('Feature' == this.getSetting('piLevelType')){
             level = 2;
         }else{
             level = 4;           
         }
-
-        //var level = 'Feature' == this.getSetting('piLevelType') ? 2:4;
 
         var filters = [{
             property: 'DirectChildrenCount',
@@ -222,9 +212,7 @@ Ext.define("feature-catalog", {
         }];
 
 
-        // if (idx > 2) {
         if (idx > level) {
-            // var property = _.range(idx - 2).map(function (p) {
             var property = _.range(idx - level).map(function (p) {
                 return "Parent";
             }).join(".");
@@ -243,19 +231,16 @@ Ext.define("feature-catalog", {
             }
         }
 
-        console.log(filters);
+        console.log('_getPlugins',filters);
 
         plugins.push({
             ptype: 'tscatalogpickerplugin',
-            // fieldLabel: this.portfolioItemTypes[2].name,
             fieldLabel: this.portfolioItemTypes[level].name,
             storeConfig: {
-                // model: types[2],
                 model: types[level],
                 filters: filters
             },
-            // types: [this.portfolioItemTypes[1].typePath]
-            types: 'UserStory' == this.getSetting('piLevelType') ? ['hierarchicalrequirement']:[this.portfolioItemTypes[level-1].typePath]
+            types: [this.portfolioItemTypes[level-1].typePath]
         });
 
         plugins.push({
@@ -266,24 +251,7 @@ Ext.define("feature-catalog", {
             stateId: this.getContext().getScopedStateId('catalog-columns')
         });
         
-        // var lowest_level_pi_type_name = this.portfolioItemTypes[0].typePath;
-        var lowest_level_pi_type_name;
-        if('UserStory' == this.getSetting('piLevelType')){
-             lowest_level_pi_type_name = 'hierarchicalrequirement';
-        }else{
-            lowest_level_pi_type_name = this.portfolioItemTypes[level-2].typePath;          
-        }        
-        
-        // plugins.push({
-        //     ptype: 'rallygridboardcustomfiltercontrol',
-        //     headerPosition: 'left',
-        //     filterControlConfig: {
-        //         modelNames: [lowest_level_pi_type_name],
-        //         stateful: false,
-        //         stateId: this.getContext().getScopedStateId('catalog-grid-filter')
-        //     }
-        // });
-
+        var lowest_level_pi_type_name = this.portfolioItemTypes[level-1].typePath;
         plugins.push({
             ptype: 'rallygridboardinlinefiltercontrol',
             inlineFilterButtonConfig: {
@@ -305,6 +273,7 @@ Ext.define("feature-catalog", {
         return plugins;
     },
     
+
     getSettingsFields: function(){
         var model;
         if('UserStory' == this.getSetting('piLevelType')){
@@ -315,8 +284,6 @@ Ext.define("feature-catalog", {
             model = this.portfolioItemTypes && this.portfolioItemTypes[2].typePath;            
         }
 
-        //var level = 'Feature' == this.getSetting('piLevelType') ? 2:4;
-        //var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
         var fields = [],
             width = 500,
             labelWidth = 150;
@@ -324,21 +291,6 @@ Ext.define("feature-catalog", {
         var piLevelType = this.getPILevelType();
         if (model){
             fields = [
-            //{
-            //    xtype: 'rallyfieldcombobox',
-            //    name: 'level3TemplateField',
-            //    fieldLabel: 'FCID01 Capability Field',
-            //    model: model,
-            //    width: width,
-            //    labelWidth: labelWidth
-            //}, {
-            //    xtype: 'rallyfieldcombobox',
-            //    name: 'level2TemplateField',
-            //    fieldLabel: 'FCID02 Feature Field',
-            //    model: model,
-            //    width: width,
-            //    labelWidth: labelWidth
-            //},
 
             {
                 xtype: 'rallyfieldcombobox',

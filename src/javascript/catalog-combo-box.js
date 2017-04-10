@@ -50,6 +50,8 @@ Ext.define('Rally.technicalservices.CatalogCombobox',{
         if(this.isDestroyed) {
             return;
         }
-        this.setValue(this.store.getAt(0).get(this.valueField));
+        if(this.store.getAt(0)){
+            this.setValue(this.store.getAt(0).get(this.valueField));
+        }
     }
 });
