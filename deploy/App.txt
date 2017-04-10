@@ -3,11 +3,11 @@
 <head>
     <title>Feature Catalog Selector</title>
     <!--  (c) 2015 Rally Software Development Corp.  All Rights Reserved. -->
-    <!--  Build Date: Thu Mar 16 2017 14:02:37 GMT-0700 (PDT) -->
+    <!--  Build Date: Mon Apr 10 2017 16:23:27 GMT-0700 (PDT) -->
     
     <script type="text/javascript">
-        var APP_BUILD_DATE = "Thu Mar 16 2017 14:02:37 GMT-0700 (PDT)";
-        var CHECKSUM = 114501193272;
+        var APP_BUILD_DATE = "Mon Apr 10 2017 16:23:27 GMT-0700 (PDT)";
+        var CHECKSUM = 110300874377;
     </script>
     
     <script type="text/javascript" src="/apps/2.1/sdk.js"></script>
@@ -190,6 +190,7 @@ Ext.define("feature-catalog", {
     },
 
     items: [
+        {xtype:'container',itemId:'selector_box',layout:{type:'hbox'}},
         {xtype:'container',itemId:'display_box'}
     ],
     
@@ -200,7 +201,6 @@ Ext.define("feature-catalog", {
                 this.portfolioItemTypes = portfolioItemTypes;
                 Rally.data.ModelFactory.getModel({
                     type: portfolioItemTypes[1].typePath,
-                    //type: portfolioItemTypes[0].typePath,
                     success: function(model) {
                         this.portfolioItemModel = model;
                         this.updateDisplay();
@@ -253,7 +253,7 @@ Ext.define("feature-catalog", {
     },
     _getTreeModels: function(){
         if('UserStory' == this.getSetting('piLevelType')){
-            return ['hierarchicalrequirement'];
+            return [this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
         }else if('Feature' == this.getSetting('piLevelType')){
             return [this.portfolioItemTypes[1].typePath.toLowerCase(),this.portfolioItemTypes[0].typePath.toLowerCase(),'hierarchicalrequirement'];
         }else{
@@ -273,7 +273,7 @@ Ext.define("feature-catalog", {
         var idxRange;
 
         if('UserStory' == this.getSetting('piLevelType')){
-            idxRange =  0;
+            idxRange =  idx;
         }else if('Feature' == this.getSetting('piLevelType')){
             idxRange = idx-1;
         }else{
@@ -281,21 +281,12 @@ Ext.define("feature-catalog", {
         }
 
         var parentFilters = [];
-        if('UserStory' == this.getSetting('piLevelType')){
-            idxRange =  idx-1;
-            parentFilters = [{
-                property: 'Feature',
-                operator: "!=",
-                value: parentPortfolioItem
-            }];            
-        }else {
             var parentFiltersProperty = _.range(idxRange).map(function(p){return "Parent";}).join(".");
             parentFilters = [{
                 property: parentFiltersProperty,
                 operator: "!=",
                 value: parentPortfolioItem
             }];
-        }
 
         this.logger.log('parentFilters:', parentFilters);
         return parentFilters;
@@ -323,7 +314,7 @@ Ext.define("feature-catalog", {
         var typesToCopy = [],
             portfolioItemParentModel;
         if('UserStory' == this.getSetting('piLevelType')){
-            portfolioItemParentModel = 'hierarchicalrequirement';
+            portfolioItemParentModel = this.portfolioItemTypes[0].typePath.toLowerCase();//'hierarchicalrequirement';
             typesToCopy = ['hierarchicalrequirement','task'];
         }else if('Feature' == this.getSetting('piLevelType')){
             portfolioItemParentModel = this.portfolioItemTypes[1].typePath.toLowerCase();
@@ -370,6 +361,7 @@ Ext.define("feature-catalog", {
             height: this.getHeight()
         });
     },
+
     _getPlugins: function(){
         var plugins = [];
 
@@ -384,14 +376,12 @@ Ext.define("feature-catalog", {
         var level;
 
         if('UserStory' == this.getSetting('piLevelType')){
-            level = 0;
+            level = 1;
         }else if('Feature' == this.getSetting('piLevelType')){
             level = 2;
         }else{
             level = 4;           
         }
-
-        //var level = 'Feature' == this.getSetting('piLevelType') ? 2:4;
 
         var filters = [{
             property: 'DirectChildrenCount',
@@ -400,9 +390,7 @@ Ext.define("feature-catalog", {
         }];
 
 
-        // if (idx > 2) {
         if (idx > level) {
-            // var property = _.range(idx - 2).map(function (p) {
             var property = _.range(idx - level).map(function (p) {
                 return "Parent";
             }).join(".");
@@ -421,19 +409,16 @@ Ext.define("feature-catalog", {
             }
         }
 
-        console.log(filters);
+        console.log('_getPlugins',filters);
 
         plugins.push({
             ptype: 'tscatalogpickerplugin',
-            // fieldLabel: this.portfolioItemTypes[2].name,
             fieldLabel: this.portfolioItemTypes[level].name,
             storeConfig: {
-                // model: types[2],
                 model: types[level],
                 filters: filters
             },
-            // types: [this.portfolioItemTypes[1].typePath]
-            types: 'UserStory' == this.getSetting('piLevelType') ? ['hierarchicalrequirement']:[this.portfolioItemTypes[level-1].typePath]
+            types: [this.portfolioItemTypes[level-1].typePath]
         });
 
         plugins.push({
@@ -444,24 +429,7 @@ Ext.define("feature-catalog", {
             stateId: this.getContext().getScopedStateId('catalog-columns')
         });
         
-        // var lowest_level_pi_type_name = this.portfolioItemTypes[0].typePath;
-        var lowest_level_pi_type_name;
-        if('UserStory' == this.getSetting('piLevelType')){
-             lowest_level_pi_type_name = 'hierarchicalrequirement';
-        }else{
-            lowest_level_pi_type_name = this.portfolioItemTypes[level-2].typePath;          
-        }        
-        
-        // plugins.push({
-        //     ptype: 'rallygridboardcustomfiltercontrol',
-        //     headerPosition: 'left',
-        //     filterControlConfig: {
-        //         modelNames: [lowest_level_pi_type_name],
-        //         stateful: false,
-        //         stateId: this.getContext().getScopedStateId('catalog-grid-filter')
-        //     }
-        // });
-
+        var lowest_level_pi_type_name = this.portfolioItemTypes[level-1].typePath;
         plugins.push({
             ptype: 'rallygridboardinlinefiltercontrol',
             inlineFilterButtonConfig: {
@@ -483,6 +451,7 @@ Ext.define("feature-catalog", {
         return plugins;
     },
     
+
     getSettingsFields: function(){
         var model;
         if('UserStory' == this.getSetting('piLevelType')){
@@ -493,8 +462,6 @@ Ext.define("feature-catalog", {
             model = this.portfolioItemTypes && this.portfolioItemTypes[2].typePath;            
         }
 
-        //var level = 'Feature' == this.getSetting('piLevelType') ? 2:4;
-        //var model = this.portfolioItemTypes && this.portfolioItemTypes[0].typePath,
         var fields = [],
             width = 500,
             labelWidth = 150;
@@ -502,21 +469,6 @@ Ext.define("feature-catalog", {
         var piLevelType = this.getPILevelType();
         if (model){
             fields = [
-            //{
-            //    xtype: 'rallyfieldcombobox',
-            //    name: 'level3TemplateField',
-            //    fieldLabel: 'FCID01 Capability Field',
-            //    model: model,
-            //    width: width,
-            //    labelWidth: labelWidth
-            //}, {
-            //    xtype: 'rallyfieldcombobox',
-            //    name: 'level2TemplateField',
-            //    fieldLabel: 'FCID02 Feature Field',
-            //    model: model,
-            //    width: width,
-            //    labelWidth: labelWidth
-            //},
 
             {
                 xtype: 'rallyfieldcombobox',
@@ -721,7 +673,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                     success: function(){
                         this.logger.log('set parent', parent.get('_ref'));
                         var root = me.tree[me.rootArtifact.get('ObjectID')].copyRecord;
-                        root.set("Parent", parent.get('_ref'));
+                        parent.get('_type') == "portfolioitem/feature" ? root.set("PortfolioItem", parent.get('_ref')):root.set("Parent", parent.get('_ref'));
+                        
                         root.save().then({
                             success: function(result, operation){
                                 me.fireEvent('copycompleted', me.tree[me.rootArtifact.get('ObjectID')].copyRecord);
@@ -805,11 +758,15 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
         _.each(this.tree, function(obj, oid){
             if (obj.record.get('_type').toLowerCase() !== 'task' && !obj.copyRecord){
-                promises.push(this.copyArtifact(oid, overrides));
+                // promises.push(this.copyArtifact(oid, overrides));
+                promises.push(function() {
+                    return this.copyArtifact(oid, overrides);
+                });
             }
         }, this);
 
-        Deft.Promise.all(promises, this).then({
+
+        Deft.Chain.sequence(promises, this).then({
             success: function(){
                 deferred.resolve();
             },
@@ -1233,12 +1190,15 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
         _.each(collectionFields, function(cf){
             if (artifact.get(cf) && artifact.get(cf).Count && artifact.get(cf).Count > 0){
-                promises.push(this._loadCollection(artifact, cf, false, cf === 'Tags'));
+                //promises.push(this._loadCollection(artifact, cf, false, cf === 'Tags'));
+                promises.push(function() {
+                    return this.copyArtifact(oid, overrides);
+                });                
             }
         }, this);
 
         if (promises.length > 0){
-            Deft.Promise.all(promises).then({
+            Deft.Chain.sequence(promises).then({
                 success: function(){
                     this.logger.log('artifact collections loaded', artifact);
                     this._loadArtifactChildren(artifact)
@@ -1453,7 +1413,9 @@ Ext.define('Rally.technicalservices.CatalogCombobox',{
         if(this.isDestroyed) {
             return;
         }
-        this.setValue(this.store.getAt(0).get(this.valueField));
+        if(this.store.getAt(0)){
+            this.setValue(this.store.getAt(0).get(this.valueField));
+        }
     }
 });
 Ext.define('Rally.technicalservices.plugin.CatalogPickerPlugin', {

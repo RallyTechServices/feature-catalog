@@ -82,7 +82,8 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
                     success: function(){
                         this.logger.log('set parent', parent.get('_ref'));
                         var root = me.tree[me.rootArtifact.get('ObjectID')].copyRecord;
-                        root.set("Parent", parent.get('_ref'));
+                        parent.get('_type') == "portfolioitem/feature" ? root.set("PortfolioItem", parent.get('_ref')):root.set("Parent", parent.get('_ref'));
+                        
                         root.save().then({
                             success: function(result, operation){
                                 me.fireEvent('copycompleted', me.tree[me.rootArtifact.get('ObjectID')].copyRecord);
@@ -166,11 +167,15 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
         _.each(this.tree, function(obj, oid){
             if (obj.record.get('_type').toLowerCase() !== 'task' && !obj.copyRecord){
-                promises.push(this.copyArtifact(oid, overrides));
+                // promises.push(this.copyArtifact(oid, overrides));
+                promises.push(function() {
+                    return this.copyArtifact(oid, overrides);
+                });
             }
         }, this);
 
-        Deft.Promise.all(promises, this).then({
+
+        Deft.Chain.sequence(promises, this).then({
             success: function(){
                 deferred.resolve();
             },
@@ -594,12 +599,15 @@ Ext.define('Rally.technicalservices.ArtifactTree',{
 
         _.each(collectionFields, function(cf){
             if (artifact.get(cf) && artifact.get(cf).Count && artifact.get(cf).Count > 0){
-                promises.push(this._loadCollection(artifact, cf, false, cf === 'Tags'));
+                //promises.push(this._loadCollection(artifact, cf, false, cf === 'Tags'));
+                promises.push(function() {
+                    return this.copyArtifact(oid, overrides);
+                });                
             }
         }, this);
 
         if (promises.length > 0){
-            Deft.Promise.all(promises).then({
+            Deft.Chain.sequence(promises).then({
                 success: function(){
                     this.logger.log('artifact collections loaded', artifact);
                     this._loadArtifactChildren(artifact)
